@@ -10,13 +10,15 @@ path has never run (no API key on the build machine). A fresh-context adversaria
 one is fixed (audit record kind is now sealed into the hash), the rest are listed below in priority order.
 Agent B's `surfaces/` folder is empty apart from its CLAUDE.md.
 
+Sharing and sync: [COLLABORATION.md](COLLABORATION.md). Repo-contained build summary: [BUILD_PLAN.md](BUILD_PLAN.md).
+
 ## Start here (10 minutes)
 ```bash
 git clone https://github.com/agile-flight/doris && cd doris
 uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/pytest -q                                  # all green, offline, no network
 .venv/bin/python -m detector --offline evaluate      # the confusion matrix
-.venv/bin/python -m detector serve                   # API on http://127.0.0.1:8787 for the surfaces
+.venv/bin/python -m detector --offline serve         # API on http://127.0.0.1:8787 for the surfaces
 export ANTHROPIC_API_KEY=...                         # then re-run serve: extraction + judgment on claude-opus-5-5
 ```
 Read `CLAUDE.md`, then `contract/README.md`. Work in slices with `/slice <task>` (Claude Code skill in

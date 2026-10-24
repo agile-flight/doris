@@ -17,3 +17,7 @@ Append dated notes here when anything B reads changes: schema, samples, API, out
 - Confusion matrix: `python -m detector evaluate` writes `data/evidence/confusion_matrix.json`; the API serves it at
   `GET /evaluation` (`metrics.catch_rate`, `metrics.false_positive_rate`, `metrics.legit_blocked`, `rows[]`). Offline:
   14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design (first-time vendor, genuine bank change).
+
+## 2026-10-23 — handoff verification
+- Added COLLABORATION.md (private repo access, offline setup, commit/push/pull workflow) and BUILD_PLAN.md (repository summary plus original document link).
+- Reverified 162 tests, contract check, and offline evaluation. No API calls or contract changes. Original Claude doc requires sign-in; its Handoff tab was not modified.
