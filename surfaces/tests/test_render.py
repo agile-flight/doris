@@ -86,7 +86,7 @@ def test_ct_strip_marks_the_young_lookalike():
     assert "acmesupply-billing.com" in svg and "acmesupply.com" in svg
     assert re.search(r'class="bad"[^>]*>acmesupply-billing\.com', svg)
     assert "got its first certificate" in svg and "has had certificates since" in svg
-    assert "Last 30 days" in svg and "Invoice" in svg
+    assert re.search(r"Last \d+ days", svg) and "Invoice" in svg
 
 
 def test_ct_strip_handles_empty_and_single_domain():

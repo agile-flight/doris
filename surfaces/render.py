@@ -112,7 +112,7 @@ input[type=text]{padding:7px 10px;border-radius:8px;border:1px solid var(--line)
 svg text{fill:var(--ink)}svg .q{fill:var(--quiet)}svg .ax{stroke:var(--line)}svg .bad{fill:var(--blocked)}svg .badline{stroke:var(--blocked)}
 svg .good{fill:var(--pay)}svg .mid{fill:var(--quiet)}svg .inv{stroke:var(--callback)}svg .invt{fill:var(--callback)}
 .scroll{overflow-x:auto}
-body.blocked-screen{background:var(--blocked);color:#fff}body.blocked-screen .panel{color:var(--ink)}
+body.blocked-screen{background:#9f1f19;color:#fff}body.blocked-screen .panel{color:var(--ink)}body.blocked-screen header.top .tag,body.blocked-screen header.top a{color:#fff;opacity:.9}
 .blocked-hero{text-align:center;padding:48px 16px 28px}.blocked-hero h1{font-size:clamp(56px,12vw,120px);margin:0;letter-spacing:.04em}
 .blocked-hero p{font-size:20px;margin:8px auto 0;max-width:720px}
 .flash{padding:10px 14px;border-radius:8px;background:var(--hold-tint);color:var(--hold);margin-bottom:12px}
@@ -239,7 +239,10 @@ def ct_strip(d: dict) -> str:
     W, LEFT, RIGHT = 760, 190, 740
     lane_h, top = 46, 34
     H = top + lane_h * len(domains) + 30
-    recent_start = t_inv - timedelta(days=30)
+    # Stretch the recent window to fit the youngest certificate, so days-old and the invoice don't touch.
+    ages = [(t_inv - first_seen[dom]).total_seconds() / 86400 for dom in young]
+    window_days = min(30, max(7, int(max(ages) * 2.5) + 1)) if ages else 30
+    recent_start = t_inv - timedelta(days=window_days)
     t_min = min(parse_ts(e["at"]) for e in events)
     split = t_min < recent_start
     mid = LEFT + (RIGHT - LEFT) * 0.45
@@ -258,7 +261,7 @@ def ct_strip(d: dict) -> str:
     parts = [f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="Certificate Transparency timeline" font-size="12">']
     if split:
         parts.append(f'<text class="q" x="{LEFT}" y="16">{esc(when(t_min.isoformat(), "month"))} onward</text>'
-                     f'<text class="q" x="{mid + 8:.0f}" y="16">Last 30 days</text>'
+                     f'<text class="q" x="{mid + 8:.0f}" y="16">Last {window_days} days</text>'
                      f'<text class="q" x="{mid - 4:.0f}" y="{H - 10}">//</text>')
     for i, dom in enumerate(domains):
         y = top + lane_h * i + 16
@@ -273,8 +276,9 @@ def ct_strip(d: dict) -> str:
             if kind == "cert_first_seen":
                 c = "bad" if dom in young else "good"
                 label = when(e["at"], "short" if dom in young else "month")
+                anchor, tx = ("end", ex + 6) if ex > RIGHT - 70 else ("start", ex - 6) if ex < LEFT + 50 else ("middle", ex)
                 parts.append(f'<circle cx="{ex:.1f}" cy="{y}" r="6" class="{c}"><title>{esc(e.get("label"))}</title></circle>'
-                             f'<text x="{ex:.1f}" y="{y + 20}" text-anchor="middle" class="{c}">{esc(label)}</text>')
+                             f'<text x="{tx:.1f}" y="{y + 20}" text-anchor="{anchor}" class="{c}">{esc(label)}</text>')
             elif kind == "cert_issued":
                 parts.append(f'<circle cx="{ex:.1f}" cy="{y}" r="3" class="mid"><title>{esc(e.get("label"))}</title></circle>')
             elif kind == "vendor_on_file_since":

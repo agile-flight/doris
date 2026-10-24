@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "detector",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "detector", "serve", "--port", "8787"],
+      "port": 8787
+    },
+    {
+      "name": "surfaces",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "surfaces", "serve"],
+      "port": 8788
+    }
+  ]
+}
