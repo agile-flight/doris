@@ -1,9 +1,7 @@
 {
-  "invoice_id": "inv_1042",
-  "decision_id": "dec_8f2c1a9b0002",
-  "seq": 2,
+  "invoice_id": "INV-1042",
   "created_at": "2026-10-22T09:03:20Z",
-  "vendor_claimed": "Acme Supply",
+  "vendor_claimed": "Acme Supply Billing",
   "vendor_id": "ven_acme_supply",
   "payee_name": "Acme Supply Co.",
   "amount": 4820.0,
@@ -20,36 +18,52 @@
       "detail": "Requests payment to ****8841; account on file is ****1234",
       "evidence": {
         "new_last4": "8841",
-        "on_file_last4": "1234"
+        "on_file_last4": "1234",
+        "claimed_change": true
       }
     },
     {
       "name": "prompt_injection",
       "fired": false,
       "weight": "highest",
-      "detail": "No hidden or AI-addressed text"
+      "detail": "No hidden or AI-addressed text",
+      "evidence": {
+        "count": 0
+      }
     },
     {
       "name": "vendor_contact_changed",
       "fired": false,
       "weight": "high",
-      "detail": "No vendor record edits in the last 90 days"
+      "detail": "No vendor record edits in the last 90 days",
+      "evidence": {
+        "days_ago": null,
+        "field": null,
+        "requested": false
+      }
     },
     {
       "name": "payee_name_mismatch",
       "fired": false,
       "weight": "high",
-      "detail": "Payee matches vendor on file"
+      "detail": "Payee matches vendor on file",
+      "evidence": {
+        "payee": "Acme Supply Co.",
+        "similarity": 1.0
+      }
     },
     {
       "name": "lookalike_domain",
       "fired": true,
       "weight": "high",
-      "detail": "acmesupply-billing.com is 8 edits from acmesupply.com (vendor on file)",
+      "detail": "acmesupply-billing.com (sender) imitates acmesupply.com, the vendor domain on file, by label-append",
       "evidence": {
+        "field": "sender",
+        "domain": "acmesupply-billing.com",
         "sender_domain": "acmesupply-billing.com",
         "on_file_domain": "acmesupply.com",
-        "method": "suffix-append"
+        "method": "label-append",
+        "differs": true
       }
     },
     {
@@ -58,38 +72,35 @@
       "weight": "medium-high",
       "detail": "First certificate for acmesupply-billing.com seen 2026-10-20 02:14 UTC, 2 days before the invoice",
       "evidence": {
+        "status": "ok",
+        "domain": "acmesupply-billing.com",
+        "none_found": false,
         "first_seen": "2026-10-20T02:14:00Z",
-        "age_days": 2
+        "age_days": 2,
+        "count": 1
       }
     },
     {
       "name": "amount_anomaly",
       "fired": false,
       "weight": "medium",
-      "detail": "$4,820.00 is within this vendor's usual range (median $4,650.00)"
+      "detail": "$4,820.00 is within this vendor's usual range (median $4,650.00)",
+      "evidence": {
+        "n": 5,
+        "median": 4650.0,
+        "max": 4900.0,
+        "ratio": 1.04
+      }
     },
     {
       "name": "urgency_language",
       "fired": true,
       "weight": "low-medium",
-      "detail": "\"must be updated before Friday's run\"",
+      "detail": "\"before friday's\", \"effective immediately\"",
       "evidence": {
         "phrases": [
-          "must be updated before Friday"
-        ]
-      }
-    },
-    {
-      "name": "llm_judgment",
-      "fired": true,
-      "weight": "residual",
-      "detail": "risk 0.72: classic bank-change narrative with a plausible 'new treasury provider' justification and a deadline",
-      "evidence": {
-        "risk": 0.72,
-        "tactics": [
-          "bank_change_narrative",
-          "plausible_justification",
-          "urgency"
+          "before friday's",
+          "effective immediately"
         ]
       }
     },
@@ -98,14 +109,25 @@
       "fired": false,
       "weight": "gate",
       "detail": "Vendor on file since 2021"
+    },
+    {
+      "name": "llm_judgment",
+      "fired": false,
+      "weight": "residual",
+      "detail": "skipped: offline mode (DORIS_OFFLINE=1)",
+      "evidence": {
+        "status": "skipped",
+        "reason": "offline mode (DORIS_OFFLINE=1)"
+      }
     }
   ],
-  "risk_score": 0.81,
+  "risk_score": 0.79,
   "decision": "CALLBACK",
   "reasons": [
     "Bank account change requested: ****1234 to ****8841",
-    "Sender domain acmesupply-billing.com is a lookalike of acmesupply.com",
+    "Sender domain acmesupply-billing.com is a lookalike of acmesupply.com (label-append)",
     "That domain got its first certificate 2 days ago",
+    "Pressure language: \"before friday's\", \"effective immediately\"",
     "Doris is calling +1 415 555 0123, on file since March 2021"
   ],
   "callback_number": "+14155550123",
@@ -119,9 +141,27 @@
     },
     {
       "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "at": "2019-05-01T10:00:00Z",
+      "label": "acmesupply.com certificate issued"
+    },
+    {
+      "domain": "acmesupply.com",
       "kind": "vendor_on_file_since",
       "at": "2021-03-10T17:22:00Z",
-      "label": "Acme Supply phone on file since"
+      "label": "Acme Supply Co. phone on file since"
+    },
+    {
+      "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "at": "2022-04-30T09:12:00Z",
+      "label": "acmesupply.com certificate issued"
+    },
+    {
+      "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "at": "2025-04-29T08:40:00Z",
+      "label": "acmesupply.com certificate issued"
     },
     {
       "domain": "acmesupply-billing.com",
@@ -133,11 +173,13 @@
       "domain": "acmesupply-billing.com",
       "kind": "invoice_received",
       "at": "2026-10-22T09:03:00Z",
-      "label": "Invoice inv_1042 received"
+      "label": "Invoice INV-1042 received"
     }
   ],
-  "llm_rationale": "The message follows the bank-change script: a new 'treasury provider', a deadline tied to the next payment run, and a request to confirm by replying to this email.",
+  "llm_rationale": null,
   "supersedes": null,
-  "audit_hash": "sha256:2d2cd5bbbdde8d074ee63fb60186080d8a3a78deb281726f8fef7edc86d166a1",
-  "prev_hash": "sha256:09857557576e33c62f9ae0f72a549dfcae259d4a64ba4081c8506ddc8d88babb"
+  "decision_id": "dec_51db47159142",
+  "seq": 7,
+  "prev_hash": "sha256:c96afcbbf8a5e6ac58dd1bcf52c99012789983c708a3144f1d2687bf15785bc3",
+  "audit_hash": "sha256:fc6e1ce43cade188d679d3dc4f22847ef1a05cf2172156df9e1c9a434abb2994"
 }

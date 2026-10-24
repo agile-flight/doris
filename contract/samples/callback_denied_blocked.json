@@ -1,109 +1,184 @@
 {
-  "invoice_id": "inv_1042",
-  "decision_id": "dec_8f2c1a9b0005",
-  "seq": 5,
-  "created_at": "2026-10-22T09:06:48Z",
-  "vendor_claimed": "Acme Supply",
-  "vendor_id": "ven_acme_supply",
-  "payee_name": "Acme Supply Co.",
   "amount": 4820.0,
-  "currency": "USD",
   "bank_account_new": "****8841",
   "bank_account_on_file": "****1234",
-  "sender_email": "billing@acmesupply-billing.com",
+  "callback_number": "+14155550123",
+  "callback_number_on_file_since": "2021-03-10T17:22:00Z",
+  "created_at": "2026-10-22T09:03:20Z",
+  "ct_timeline": [
+    {
+      "at": "2016-05-02T14:31:00Z",
+      "domain": "acmesupply.com",
+      "kind": "cert_first_seen",
+      "label": "acmesupply.com first certificate"
+    },
+    {
+      "at": "2019-05-01T10:00:00Z",
+      "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "label": "acmesupply.com certificate issued"
+    },
+    {
+      "at": "2021-03-10T17:22:00Z",
+      "domain": "acmesupply.com",
+      "kind": "vendor_on_file_since",
+      "label": "Acme Supply Co. phone on file since"
+    },
+    {
+      "at": "2022-04-30T09:12:00Z",
+      "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "label": "acmesupply.com certificate issued"
+    },
+    {
+      "at": "2025-04-29T08:40:00Z",
+      "domain": "acmesupply.com",
+      "kind": "cert_issued",
+      "label": "acmesupply.com certificate issued"
+    },
+    {
+      "at": "2026-10-20T02:14:00Z",
+      "domain": "acmesupply-billing.com",
+      "kind": "cert_first_seen",
+      "label": "acmesupply-billing.com first certificate"
+    },
+    {
+      "at": "2026-10-22T09:03:00Z",
+      "domain": "acmesupply-billing.com",
+      "kind": "invoice_received",
+      "label": "Invoice INV-1042 received"
+    }
+  ],
+  "currency": "USD",
+  "decision": "BLOCKED",
+  "invoice_id": "INV-1042",
+  "llm_rationale": null,
+  "payee_name": "Acme Supply Co.",
+  "reasons": [
+    "Vendor AP at the number on file said: \"we never changed our bank\"",
+    "Bank account change requested: ****1234 to ****8841",
+    "Sender domain acmesupply-billing.com is a lookalike of acmesupply.com (label-append)",
+    "That domain got its first certificate 2 days ago",
+    "Pressure language: \"before friday's\", \"effective immediately\""
+  ],
+  "risk_score": 0.99,
   "sender_domain": "acmesupply-billing.com",
+  "sender_email": "billing@acmesupply-billing.com",
   "signals": [
     {
-      "name": "bank_account_changed",
-      "fired": true,
-      "weight": "highest",
       "detail": "Requests payment to ****8841; account on file is ****1234",
       "evidence": {
+        "claimed_change": true,
         "new_last4": "8841",
         "on_file_last4": "1234"
-      }
-    },
-    {
-      "name": "prompt_injection",
-      "fired": false,
-      "weight": "highest",
-      "detail": "No hidden or AI-addressed text"
-    },
-    {
-      "name": "vendor_contact_changed",
-      "fired": false,
-      "weight": "high",
-      "detail": "No vendor record edits in the last 90 days"
-    },
-    {
-      "name": "payee_name_mismatch",
-      "fired": false,
-      "weight": "high",
-      "detail": "Payee matches vendor on file"
-    },
-    {
-      "name": "lookalike_domain",
+      },
       "fired": true,
-      "weight": "high",
-      "detail": "acmesupply-billing.com is 8 edits from acmesupply.com (vendor on file)",
+      "name": "bank_account_changed",
+      "weight": "highest"
+    },
+    {
+      "detail": "No hidden or AI-addressed text",
       "evidence": {
-        "sender_domain": "acmesupply-billing.com",
-        "on_file_domain": "acmesupply.com",
-        "method": "suffix-append"
-      }
+        "count": 0
+      },
+      "fired": false,
+      "name": "prompt_injection",
+      "weight": "highest"
     },
     {
-      "name": "new_domain_certificate",
+      "detail": "No vendor record edits in the last 90 days",
+      "evidence": {
+        "days_ago": null,
+        "field": null,
+        "requested": false
+      },
+      "fired": false,
+      "name": "vendor_contact_changed",
+      "weight": "high"
+    },
+    {
+      "detail": "Payee matches vendor on file",
+      "evidence": {
+        "payee": "Acme Supply Co.",
+        "similarity": 1.0
+      },
+      "fired": false,
+      "name": "payee_name_mismatch",
+      "weight": "high"
+    },
+    {
+      "detail": "acmesupply-billing.com (sender) imitates acmesupply.com, the vendor domain on file, by label-append",
+      "evidence": {
+        "differs": true,
+        "domain": "acmesupply-billing.com",
+        "field": "sender",
+        "method": "label-append",
+        "on_file_domain": "acmesupply.com",
+        "sender_domain": "acmesupply-billing.com"
+      },
       "fired": true,
-      "weight": "medium-high",
+      "name": "lookalike_domain",
+      "weight": "high"
+    },
+    {
       "detail": "First certificate for acmesupply-billing.com seen 2026-10-20 02:14 UTC, 2 days before the invoice",
       "evidence": {
+        "age_days": 2,
+        "count": 1,
+        "domain": "acmesupply-billing.com",
         "first_seen": "2026-10-20T02:14:00Z",
-        "age_days": 2
-      }
-    },
-    {
-      "name": "amount_anomaly",
-      "fired": false,
-      "weight": "medium",
-      "detail": "$4,820.00 is within this vendor's usual range (median $4,650.00)"
-    },
-    {
-      "name": "urgency_language",
+        "none_found": false,
+        "status": "ok"
+      },
       "fired": true,
-      "weight": "low-medium",
-      "detail": "\"must be updated before Friday's run\"",
+      "name": "new_domain_certificate",
+      "weight": "medium-high"
+    },
+    {
+      "detail": "$4,820.00 is within this vendor's usual range (median $4,650.00)",
+      "evidence": {
+        "max": 4900.0,
+        "median": 4650.0,
+        "n": 5,
+        "ratio": 1.04
+      },
+      "fired": false,
+      "name": "amount_anomaly",
+      "weight": "medium"
+    },
+    {
+      "detail": "\"before friday's\", \"effective immediately\"",
       "evidence": {
         "phrases": [
-          "must be updated before Friday"
+          "before friday's",
+          "effective immediately"
         ]
-      }
-    },
-    {
-      "name": "llm_judgment",
+      },
       "fired": true,
-      "weight": "residual",
-      "detail": "risk 0.72: classic bank-change narrative with a plausible 'new treasury provider' justification and a deadline",
-      "evidence": {
-        "risk": 0.72,
-        "tactics": [
-          "bank_change_narrative",
-          "plausible_justification",
-          "urgency"
-        ]
-      }
+      "name": "urgency_language",
+      "weight": "low-medium"
     },
     {
-      "name": "new_vendor",
+      "detail": "Vendor on file since 2021",
       "fired": false,
-      "weight": "gate",
-      "detail": "Vendor on file since 2021"
+      "name": "new_vendor",
+      "weight": "gate"
+    },
+    {
+      "detail": "skipped: offline mode (DORIS_OFFLINE=1)",
+      "evidence": {
+        "reason": "offline mode (DORIS_OFFLINE=1)",
+        "status": "skipped"
+      },
+      "fired": false,
+      "name": "llm_judgment",
+      "weight": "residual"
     },
     {
       "name": "callback_result",
       "fired": true,
       "weight": "gate",
-      "detail": "Called +1 415 555 0123 (on file since 2021-03-10). Vendor AP said: \"we never changed our bank.\"",
+      "detail": "Called +1 415 555 0123 (on file since 2021-03-10). Vendor AP said: \"we never changed our bank\"",
       "evidence": {
         "vendor_confirmed": false,
         "called": "+14155550123",
@@ -111,43 +186,11 @@
       }
     }
   ],
-  "risk_score": 0.99,
-  "decision": "BLOCKED",
-  "reasons": [
-    "Vendor AP at the number on file said: \"we never changed our bank\"",
-    "Bank account change requested: ****1234 to ****8841",
-    "Sender domain acmesupply-billing.com is a lookalike of acmesupply.com"
-  ],
-  "callback_number": "+14155550123",
-  "callback_number_on_file_since": "2021-03-10T17:22:00Z",
-  "ct_timeline": [
-    {
-      "domain": "acmesupply.com",
-      "kind": "cert_first_seen",
-      "at": "2016-05-02T14:31:00Z",
-      "label": "acmesupply.com first certificate"
-    },
-    {
-      "domain": "acmesupply.com",
-      "kind": "vendor_on_file_since",
-      "at": "2021-03-10T17:22:00Z",
-      "label": "Acme Supply phone on file since"
-    },
-    {
-      "domain": "acmesupply-billing.com",
-      "kind": "cert_first_seen",
-      "at": "2026-10-20T02:14:00Z",
-      "label": "acmesupply-billing.com first certificate"
-    },
-    {
-      "domain": "acmesupply-billing.com",
-      "kind": "invoice_received",
-      "at": "2026-10-22T09:03:00Z",
-      "label": "Invoice inv_1042 received"
-    }
-  ],
-  "llm_rationale": "The message follows the bank-change script: a new 'treasury provider', a deadline tied to the next payment run, and a request to confirm by replying to this email.",
-  "supersedes": "dec_8f2c1a9b0002",
-  "audit_hash": "sha256:80e25f6cc34914d0d2fb4ab608d3543eb44008096aa981550fed0cd88560b10d",
-  "prev_hash": "sha256:4dd10937cf60dc1b8a14da2381cbea83d572904b51ac7e5a0d970171c2b2a137"
+  "supersedes": "dec_51db47159142",
+  "vendor_claimed": "Acme Supply Billing",
+  "vendor_id": "ven_acme_supply",
+  "decision_id": "dec_36f6ccba382d",
+  "seq": 14,
+  "prev_hash": "sha256:6452aedb5847f9c808a77266552effdbd0644542e90d799a3ae74c1988af803a",
+  "audit_hash": "sha256:6e0eefd7ba07f41c62d3588079d6d17f638524eb459902c5af1c910d1dfc4bb6"
 }

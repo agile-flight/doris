@@ -1,9 +1,7 @@
 {
-  "invoice_id": "inv_1044",
-  "decision_id": "dec_8f2c1a9b0004",
-  "seq": 4,
-  "created_at": "2026-10-22T14:52:03Z",
-  "vendor_claimed": "Northwind Traders",
+  "invoice_id": "INV-1044",
+  "created_at": "2026-10-22T09:03:20Z",
+  "vendor_claimed": "Northwind Traders AR",
   "vendor_id": null,
   "payee_name": "Northwind Traders Inc.",
   "amount": 1250.0,
@@ -17,68 +15,106 @@
       "name": "bank_account_changed",
       "fired": false,
       "weight": "highest",
-      "detail": "No account on file to compare"
+      "detail": "No account on file to compare",
+      "evidence": {
+        "new_last4": "5520",
+        "on_file_last4": null,
+        "claimed_change": false
+      }
     },
     {
       "name": "prompt_injection",
       "fired": false,
       "weight": "highest",
-      "detail": "No hidden or AI-addressed text"
+      "detail": "No hidden or AI-addressed text",
+      "evidence": {
+        "count": 0
+      }
     },
     {
       "name": "vendor_contact_changed",
       "fired": false,
       "weight": "high",
-      "detail": "No vendor record"
+      "detail": "No vendor record",
+      "evidence": {
+        "days_ago": null,
+        "requested": false
+      }
     },
     {
       "name": "payee_name_mismatch",
       "fired": false,
       "weight": "high",
-      "detail": "No vendor record to compare"
+      "detail": "No vendor record to compare",
+      "evidence": {
+        "payee": "Northwind Traders Inc.",
+        "similarity": null
+      }
     },
     {
       "name": "lookalike_domain",
       "fired": false,
       "weight": "high",
-      "detail": "No vendor domain on file; northwindtraders.com is not near any vendor on file"
+      "detail": "No vendor domain on file; northwindtraders.com is not near any vendor on file",
+      "evidence": {
+        "field": "sender",
+        "domain": "northwindtraders.com",
+        "sender_domain": "northwindtraders.com",
+        "on_file_domain": null,
+        "method": null,
+        "differs": null
+      }
     },
     {
       "name": "new_domain_certificate",
       "fired": false,
       "weight": "medium-high",
-      "detail": "First certificate seen 2012-09-14"
+      "detail": "First certificate seen 2012-09-14",
+      "evidence": {
+        "status": "ok",
+        "domain": "northwindtraders.com",
+        "none_found": false,
+        "first_seen": "2012-09-14T10:05:00Z",
+        "age_days": 5151,
+        "count": 3
+      }
     },
     {
       "name": "amount_anomaly",
       "fired": false,
       "weight": "medium",
-      "detail": "No payment history"
+      "detail": "No payment history (new vendor)",
+      "evidence": {
+        "n": 0
+      }
     },
     {
       "name": "urgency_language",
       "fired": false,
       "weight": "low-medium",
-      "detail": "No pressure language"
-    },
-    {
-      "name": "llm_judgment",
-      "fired": false,
-      "weight": "residual",
-      "detail": "risk 0.15: ordinary first invoice, no pressure",
+      "detail": "No pressure language",
       "evidence": {
-        "risk": 0.15,
-        "tactics": []
+        "phrases": []
       }
     },
     {
       "name": "new_vendor",
       "fired": true,
       "weight": "gate",
-      "detail": "No record on file for Northwind Traders; first payment is always human-reviewed"
+      "detail": "No record on file for Northwind Traders AR; first payment is always human-reviewed"
+    },
+    {
+      "name": "llm_judgment",
+      "fired": false,
+      "weight": "residual",
+      "detail": "skipped: offline mode (DORIS_OFFLINE=1)",
+      "evidence": {
+        "status": "skipped",
+        "reason": "offline mode (DORIS_OFFLINE=1)"
+      }
     }
   ],
-  "risk_score": 0.12,
+  "risk_score": 0.0,
   "decision": "HOLD",
   "reasons": [
     "First-time vendor: no record on file, so Doris cannot call a number on file",
@@ -95,13 +131,27 @@
     },
     {
       "domain": "northwindtraders.com",
+      "kind": "cert_issued",
+      "at": "2020-09-10T11:00:00Z",
+      "label": "northwindtraders.com certificate issued"
+    },
+    {
+      "domain": "northwindtraders.com",
+      "kind": "cert_issued",
+      "at": "2024-09-08T11:30:00Z",
+      "label": "northwindtraders.com certificate issued"
+    },
+    {
+      "domain": "northwindtraders.com",
       "kind": "invoice_received",
       "at": "2026-10-22T14:52:00Z",
-      "label": "Invoice inv_1044 received"
+      "label": "Invoice INV-1044 received"
     }
   ],
-  "llm_rationale": "An ordinary first invoice with no pressure language; nothing on file yet to verify it against.",
+  "llm_rationale": null,
   "supersedes": null,
-  "audit_hash": "sha256:4dd10937cf60dc1b8a14da2381cbea83d572904b51ac7e5a0d970171c2b2a137",
-  "prev_hash": "sha256:b3860e8cdaa7f22930558844bbb452cee3a93d68c36f8937cf54291168bf09bb"
+  "decision_id": "dec_c8e225deadb5",
+  "seq": 11,
+  "prev_hash": "sha256:2e577305b1410dda54b7787f103fe281a85aa079591688936677ae9d1bb7d4c9",
+  "audit_hash": "sha256:667a1249c338a938d197b2b744e745bc4a1fde540752ce7b52ac81024c152ead"
 }
