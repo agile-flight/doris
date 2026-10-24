@@ -58,6 +58,13 @@ class Settings:
     door_per_minute: int = 30
     door_max_bytes: int = 5_000_000
     bounty_freeze_at: str = ""    # ISO time; after it the door stops checking (protects the demo)
+    role: str = "all"             # "demo" (dashboard + callback + AP inbox), "bounty" (door only), or "all" (development)
+    door_auth: str = "spf"        # reply only to verified senders: "spf", "authres:<authserv-id>", or "off"
+    door_daily: int = 400         # checks per 24 h through the door: caps Claude spend
+    door_concurrency: int = 3     # door checks running at once
+    max_connections: int = 64     # per server; extra connections are closed at once
+    ap_allowed: tuple = ()        # senders whose mail may reach the AP inbox (empty = any verified sender)
+    auto_call_cooldown: int = 120 # seconds between automatic calls, so nothing can ring the table in a loop
     extra: dict = field(default_factory=dict)
 
     @property
@@ -81,6 +88,12 @@ class Settings:
             inbound_token=env.get("DORIS_INBOUND_TOKEN", ""), postmark_token=env.get("POSTMARK_SERVER_TOKEN", ""),
             door_from=env.get("DORIS_DOOR_FROM", ""), bounty_freeze_at=env.get("DORIS_BOUNTY_FREEZE_AT", ""),
         )
+        s.role = env.get("DORIS_ROLE", s.role)
+        s.door_auth = env.get("DORIS_DOOR_AUTH", s.door_auth)
+        s.door_daily = int(env.get("DORIS_DOOR_DAILY", s.door_daily))
+        s.door_concurrency = int(env.get("DORIS_DOOR_CONCURRENCY", s.door_concurrency))
+        s.auto_call_cooldown = int(env.get("DORIS_AUTO_CALL_COOLDOWN", s.auto_call_cooldown))
+        s.ap_allowed = tuple(a.strip().lower() for a in env.get("DORIS_AP_ALLOWED_SENDERS", "").split(",") if a.strip())
         if env.get("DORIS_AP_INBOUND_TOKEN"):
             s.extra["ap_inbound_token"] = env["DORIS_AP_INBOUND_TOKEN"].strip()
         for k, v in overrides.items():

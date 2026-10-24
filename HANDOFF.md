@@ -101,6 +101,7 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 - [x] Agent B: screens, live dashboard, callback, door, adversarial review (308 tests pass).
 - [ ] First real call: claim the Twilio number, `python -m surfaces demo-seed --phone <table phone>`, expose port 8789 (`tailscale funnel 8789`), dry-run per `surfaces/README.md`.
 - [ ] First real email: domain + Postmark inbound for check@ and the AP inbox, each with its own secret webhook.
+- [ ] Bounty: run it as its own sandbox per `BOUNTY.md` (separate detector, database, capped key, `--role bounty`), then post the rules there.
 - [x] Live Claude run: 5/5 fixtures correct. It found two bugs, now fixed: the extraction schema was rejected
   ("Schema is too complex", so Claude was silently skipped) and crt.sh retries made each check take 80-95 s.
 - [ ] Twilio works (trial account) but has no phone number and no verified numbers. Claim a number, verify the judge-table phone, and consider upgrading: trial calls play an announcement and need a keypress before Doris speaks. Cartesia's key works.

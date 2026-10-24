@@ -428,6 +428,11 @@ def ingest(raw: bytes | str, *, now: Optional[datetime] = None) -> InboundMessag
     )
 
 
+IGNORED_TYPES = {"application/pkcs7-signature", "application/x-pkcs7-signature", "application/pgp-signature", "application/pgp-keys",
+                 "text/calendar", "application/ics", "text/vcard", "text/x-vcard"}
+IMAGE_INSPECT_BYTES = 30_000
+
+
 def extract_documents(message: InboundMessage) -> list[DocumentText]:
     """Text of every attachment, in order.
 
@@ -441,8 +446,22 @@ def extract_documents(message: InboundMessage) -> list[DocumentText]:
         if ctype == "application/pdf" or lower.endswith(".pdf") or att.data[:5] == b"%PDF-":
             doc = pdf_text(att.data)
             doc.name, doc.kind = name, "pdf"
+            if doc.error is None and doc.line_count == 0:
+                # A scan or an image-only PDF: the bank details could be in it and Doris can't see them.
+                doc.error = "no readable text (a scanned or image-only PDF)"
             docs.append(doc)
         elif ctype in ("text/html", "application/xhtml+xml") or lower.endswith((".html", ".htm")):
             text, spans = html_to_text(att.data.decode("utf-8", errors="replace"))
             docs.append(DocumentText(visible=text, hidden=spans, line_count=text.count("\n") + 1, name=name, kind="html"))
+        elif ctype == "text/plain" or lower.endswith((".txt", ".csv")):
+            text = att.data.decode("utf-8", errors="replace")
+            docs.append(DocumentText(visible=text, line_count=text.count("\n") + 1, name=name, kind="text"))
+        elif ctype in IGNORED_TYPES or lower.endswith((".ics", ".vcf", ".p7s", ".asc")):
+            continue
+        elif ctype.startswith("image/"):
+            if len(att.data) >= IMAGE_INSPECT_BYTES:     # small images are signature logos; big ones can be invoice scans
+                docs.append(DocumentText(visible="", error="an image Doris can't read", name=name, kind="image"))
+        else:
+            # Word, Excel, zip, unknown binaries: an invoice Doris can't open is never paid unseen.
+            docs.append(DocumentText(visible="", error=f"a file type Doris can't read ({ctype or 'unknown'})", name=name, kind="other"))
     return docs

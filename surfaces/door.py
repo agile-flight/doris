@@ -69,8 +69,16 @@ HEADLINE = {
 }
 
 
+_LINK = re.compile(r"(?i)\b(?:https?://|www\.)\S+")
+
+
+def _clean(text: str, limit: int = 200) -> str:
+    """Attacker-written text quoted back to a reader: no links, no line breaks, bounded."""
+    return re.sub(r"\s+", " ", _LINK.sub("[link removed]", str(text or ""))).strip()[:limit]
+
+
 def reply_text(decision: dict, v: str, feedback_base: str) -> str:
-    reasons = [r for r in decision.get("reasons") or [] if not r.startswith(AP_ONLY_REASONS)][:4]
+    reasons = [_clean(r) for r in decision.get("reasons") or [] if not r.startswith(AP_ONLY_REASONS)][:4]
     lines = [f"Doris says: {HEADLINE[v]}", ""]
     if reasons:
         lines += ["What she noticed:"] + [f"  - {r}" for r in reasons] + [""]
@@ -81,7 +89,7 @@ def reply_text(decision: dict, v: str, feedback_base: str) -> str:
         lines += ["Doris has no record of this sender, so she judged the message itself, not your vendor's records.", ""]
     llm = _signal(decision, "llm_judgment").get("evidence") or {}
     if decision.get("llm_rationale"):
-        lines += [f"Claude: {decision['llm_rationale']}", ""]
+        lines += [f"Claude: {_clean(decision['llm_rationale'], 400)}", ""]
     elif v == "safe" and llm.get("status") != "ok":
         lines += ["Her AI read of the message didn't run this time, so this is the rules talking. Stay careful with any payment request.", ""]
     lines += [f"Was Doris right?  Yes: {feedback_base}/up   No: {feedback_base}/down", "",
@@ -105,7 +113,7 @@ def postmark_to_raw(payload: dict) -> bytes:
     if payload.get("Date"):
         msg["Date"] = payload["Date"]
     for h in payload.get("Headers") or []:
-        if str(h.get("Name", "")).lower() in ("auto-submitted", "precedence", "reply-to"):
+        if str(h.get("Name", "")).lower() in ("auto-submitted", "precedence", "reply-to", "received-spf", "authentication-results"):
             msg[h["Name"]] = h.get("Value", "")
     msg.set_content(payload.get("TextBody") or "")
     if payload.get("HtmlBody"):
@@ -125,7 +133,47 @@ def _header(msg, name: str) -> str:
         return ""
 
 
-def envelope(raw: bytes) -> dict:
+def _org(domain: str) -> str:
+    parts = (domain or "").lower().strip(".").split(".")
+    two = {"co.uk", "com.au", "co.nz", "co.jp", "com.br", "co.in"}
+    return ".".join(parts[-3:]) if len(parts) >= 3 and ".".join(parts[-2:]) in two else ".".join(parts[-2:])
+
+
+def _aligned(a: str, b: str) -> bool:
+    return bool(a and b) and _org(a) == _org(b)
+
+
+def _domain_in(text: str) -> str:
+    m = (re.search(r"envelope-from=\"?<?[^\s;>\"@]*@([^\s;>\"]+)", text, re.I)
+         or re.search(r"smtp\.mailfrom=\"?(?:[^\s;\"@]*@)?([^\s;\"]+)", text, re.I)
+         or re.search(r"domain of (?:[^\s;@]*@)?([^\s;)]+)", text, re.I))
+    return m.group(1).strip(".").lower() if m else ""
+
+
+def sender_verified(msg, sender_domain: str, mode: str) -> bool:
+    """Did the receiving mail server vouch for the From domain? Only the topmost header counts: the receiving
+    server adds its own above anything the sender wrote. Confirm your provider adds the header you rely on."""
+    if mode == "off":
+        return True
+    if mode == "spf":
+        values = msg.get_all("Received-SPF") or []
+        spf = re.sub(r"\s+", " ", str(values[0])) if values else ""
+        return spf.lower().startswith("pass") and _aligned(_domain_in(spf), sender_domain)
+    if mode.startswith("authres:"):
+        authserv = mode.split(":", 1)[1].strip().lower()
+        values = msg.get_all("Authentication-Results") or []
+        ar = re.sub(r"\s+", " ", str(values[0])) if values else ""
+        if not authserv or not ar.lower().startswith(authserv):
+            return False
+        if re.search(r"\bdmarc=pass\b", ar, re.I):
+            return True
+        dkim = re.search(r"\bdkim=pass\b[^;]*?header\.[di]=@?([^\s;]+)", ar, re.I)
+        spf = re.search(r"\bspf=pass\b[^;]*?smtp\.mailfrom=(?:[^\s;@]*@)?([^\s;]+)", ar, re.I)
+        return bool(dkim and _aligned(dkim.group(1), sender_domain)) or bool(spf and _aligned(spf.group(1), sender_domain))
+    return False
+
+
+def envelope(raw: bytes, auth_mode: str = "off") -> dict:
     msg = message_from_bytes(raw, policy=policy.default)
     sender = ""
     try:
@@ -138,7 +186,11 @@ def envelope(raw: bytes) -> dict:
     auto = _header(msg, "Auto-Submitted").lower() not in ("", "no") or _header(msg, "Precedence").lower() in ("bulk", "junk", "list")
     sender = sender.strip().lower()
     local = sender.split("@")[0]
-    return {"from": sender, "subject": _header(msg, "Subject")[:150],
+    try:
+        verified = sender_verified(msg, sender.rsplit("@", 1)[-1] if "@" in sender else "", auth_mode)
+    except Exception:  # noqa: BLE001  (unreadable verification headers fail closed)
+        verified = False
+    return {"from": sender, "subject": _header(msg, "Subject")[:150], "verified": verified,
             "automated": auto or local in ("mailer-daemon", "postmaster", "noreply", "no-reply", "donotreply")}
 
 
@@ -148,6 +200,7 @@ class Door:
     def __init__(self, app):
         self.app = app
         self.outbox = app.settings.data_dir / "outbox"
+        self._running = threading.BoundedSemaphore(max(1, app.settings.door_concurrency))
 
     @staticmethod
     def _hash(sender: str) -> str:
@@ -166,12 +219,17 @@ class Door:
     def accept(self, raw: bytes, mode: str = "door") -> str:
         """Handle one inbound email ('door' = check@, 'ap' = the AP inbox). Returns what happened."""
         s = self.app.settings
-        env = envelope(raw)
+        env = envelope(raw, s.door_auth)
         sender = env["from"]
         if not sender or "@" not in sender:
             return "dropped: no sender"
         if s.door_from and sender == s.door_from.lower():
             return "dropped: our own mail"
+        if not env["verified"]:
+            # A forged From would make Doris mail a stranger: check nothing, send nothing.
+            return "dropped: sender not verified"
+        if mode == "ap" and s.ap_allowed and sender not in s.ap_allowed:
+            return "dropped: not on the AP allowlist"
         h = self._hash(sender)
         token = secrets.token_urlsafe(16)
         if mode == "door" and self.frozen():
@@ -182,9 +240,13 @@ class Door:
             self.send(sender, f"Re: {env['subject']}", "Doris is resting before her demo, so the bounty is closed and she isn't "
                       "checking new emails right now. Thanks for playing.", key=token)
             return "frozen"
-        limited = self.app.store.reserve_check(token, h, "pending", per_sender_hour=s.door_per_sender_per_hour, per_minute=s.door_per_minute)
+        limited = self.app.store.reserve_check(token, h, "pending", per_sender_hour=s.door_per_sender_per_hour, per_minute=s.door_per_minute,
+                                               per_day=s.door_daily if mode == "door" else None)
         if limited:
             return f"dropped: {limited}"
+        if not self._running.acquire(timeout=90):
+            self.app.store.set_verdict(token, "error", None)
+            return "dropped: busy"
         try:
             decision = self.app.client.check_raw(raw)
         except DetectorError as exc:
@@ -193,6 +255,8 @@ class Door:
             if mode == "door" and not env["automated"]:
                 self.send(sender, f"Re: {env['subject']}", "Doris couldn't check this one just now. Please try again in a few minutes.", key=token)
             return "error"
+        finally:
+            self._running.release()
         if mode == "ap":
             self.app.store.set_verdict(token, "ap", decision["decision_id"])
             self.app.maybe_auto_call(decision)
@@ -278,8 +342,10 @@ def wire(app) -> Door:
         msg = "Thanks. That label helps Doris get better." if ok else "That link has already been used or has expired."
         h.send(200 if ok else 404, render.page("Thanks", f'<section class="panel"><p style="margin:0">{msg}</p></section>'))
 
-    app.route("POST", r"/inbound/([A-Za-z0-9_\-]{16,64})", inbound)
-    app.route("POST", r"/inbound-ap/([A-Za-z0-9_\-]{16,64})", inbound_ap)
+    if app.settings.role in ("bounty", "all"):
+        app.route("POST", r"/inbound/([A-Za-z0-9_\-]{16,64})", inbound)
+    if app.settings.role in ("demo", "all"):
+        app.route("POST", r"/inbound-ap/([A-Za-z0-9_\-]{16,64})", inbound_ap)
     app.route("GET", r"/feedback/([A-Za-z0-9_\-]{16,32})/(up|down)", feedback_page)
     app.route("POST", r"/feedback/([A-Za-z0-9_\-]{16,32})/(up|down)", feedback_record)
     return door

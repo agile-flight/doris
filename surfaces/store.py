@@ -54,6 +54,10 @@ class Store:
             row = self._con.execute("SELECT * FROM calls WHERE token = ?", (token,)).fetchone()
         return dict(row) if row else None
 
+    def calls_since(self, since: float) -> int:
+        with self._lock:
+            return self._con.execute("SELECT COUNT(*) FROM calls WHERE created_at >= ?", (since,)).fetchone()[0]
+
     def latest_call(self, decision_id: str) -> Optional[dict]:
         with self._lock:
             row = self._con.execute("SELECT * FROM calls WHERE decision_id = ? ORDER BY created_at DESC LIMIT 1", (decision_id,)).fetchone()
@@ -66,10 +70,14 @@ class Store:
                               (token, decision_id, verdict, sender_hash, time.time()))
             self._con.commit()
 
-    def reserve_check(self, token: str, sender_hash: str, verdict: str, *, per_sender_hour: int, per_minute: int) -> Optional[str]:
+    def reserve_check(self, token: str, sender_hash: str, verdict: str, *, per_sender_hour: int, per_minute: int,
+                      per_day: Optional[int] = None) -> Optional[str]:
         """Count and insert in one locked step, so a burst can't slip past the limits. None = reserved."""
         now = time.time()
         with self._lock:
+            if per_day is not None and self._con.execute(
+                    "SELECT COUNT(*) FROM door_checks WHERE created_at >= ? AND verdict NOT IN ('frozen')", (now - 86400,)).fetchone()[0] >= per_day:
+                return "daily budget"
             n_sender = self._con.execute("SELECT COUNT(*) FROM door_checks WHERE created_at >= ? AND sender_hash = ?",
                                          (now - 3600, sender_hash)).fetchone()[0]
             if n_sender >= per_sender_hour:
@@ -104,7 +112,9 @@ class Store:
         with self._lock:
             rows = self._con.execute("SELECT verdict, feedback, COUNT(*) n FROM door_checks WHERE verdict IN ('safe','suspicious','scam')"
                                      " GROUP BY verdict, feedback").fetchall()
-        out = {"checks": 0, "safe": 0, "suspicious": 0, "scam": 0, "up": 0, "down": 0}
+        with self._lock:
+            senders = self._con.execute("SELECT COUNT(DISTINCT sender_hash) FROM door_checks WHERE verdict IN ('safe','suspicious','scam')").fetchone()[0]
+        out = {"checks": 0, "safe": 0, "suspicious": 0, "scam": 0, "up": 0, "down": 0, "senders": senders}
         for r in rows:
             out["checks"] += r["n"]
             out[r["verdict"]] = out.get(r["verdict"], 0) + r["n"]

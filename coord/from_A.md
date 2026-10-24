@@ -62,3 +62,8 @@ What B reads that changed (shape unchanged, samples regenerated):
 ## 2026-10-24 — live Claude path verified (Agent A)
 5/5 fixtures decide correctly live, ~8 s per check (Claude extraction ~4 s + judgment ~3.5 s; crt.sh prefetched in parallel).
 Decision shape unchanged. Twilio still needs its Account SID (AC...) for the callback.
+
+## 2026-10-24 — invoices Doris can't read are held (Agent A)
+A scanned PDF (no text layer), an image over 30 KB, or a Word/Excel/zip/unknown attachment now counts as unreadable,
+so the email is HOLD instead of PAY. Small images (logos), calendar and signature files are ignored; .txt and .csv
+attachments are read. Both confusion matrices are unchanged. Tests: `detector/tests/test_unreadable_attachments.py`.

@@ -16,6 +16,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("serve", help="the dashboard (localhost) and the public hooks server")
     p.add_argument("--port", type=int)
     p.add_argument("--hooks-port", type=int)
+    p.add_argument("--role", choices=["demo", "bounty", "all"], help="demo: dashboard, callback, AP inbox. bounty: the check@ door only")
     p = sub.add_parser("demo-seed", help="seed a demo detector database whose Acme record rings the judges' table")
     p.add_argument("--phone", required=True, help="E.164 number of the phone on the judges' table, e.g. +14155550123")
     p.add_argument("--db", default="data/demo.db", help="detector database to seed (use the same DORIS_DB for serve)")
@@ -31,9 +32,14 @@ def main(argv=None) -> int:
         print(seed_demo(args.phone, args.db))
         return 0
     if args.cmd == "serve":
+        if getattr(args, "role", None):
+            settings.role = args.role
+        if settings.role == "bounty" and settings.auto_call:
+            settings.auto_call = False
         app = Surfaces(settings)
         from . import callback, door
-        callback.wire(app)
+        if settings.role in ("demo", "all"):
+            callback.wire(app)
         door.wire(app)
         serve_forever(app)
     return 0

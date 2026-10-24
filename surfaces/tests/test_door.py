@@ -83,6 +83,7 @@ import urllib.error  # noqa: E402
 def opened(surfaces):
     surfaces.settings.inbound_token = TOKEN
     surfaces.settings.public_base_url = surfaces.hooks_url
+    surfaces.settings.door_auth = "off"          # verification has its own tests in test_swarm.py
     door.wire(surfaces)
     return surfaces
 

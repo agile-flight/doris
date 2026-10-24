@@ -53,6 +53,14 @@ Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen no
 Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
 Feedback links open a page whose button records the label, so link scanners can't.
 
+## Roles and the bounty
+
+`--role demo` runs the dashboard, the callback and the AP inbox; `--role bounty` runs only the check@ door, so
+bounty traffic never reaches the demo's detector, screen or phone. See `BOUNTY.md` for the two-instance setup.
+The door answers only senders the receiving server verified (`DORIS_DOOR_AUTH`, default `spf`), with a daily
+budget (`DORIS_DOOR_DAILY`, 400) and at most `DORIS_DOOR_CONCURRENCY` (3) checks at once. The AP inbox takes only
+`DORIS_AP_ALLOWED_SENDERS` when set, and auto-calls at most once per `DORIS_AUTO_CALL_COOLDOWN` (120 s).
+
 ## Tests
 
 `.venv/bin/pytest surfaces -q`. They start a real detector process and fake only Twilio and Cartesia.

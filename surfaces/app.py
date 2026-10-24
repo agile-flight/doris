@@ -58,6 +58,10 @@ class Surfaces:
 
     def maybe_auto_call(self, decision: dict) -> None:
         if decision.get("decision") == "CALLBACK" and self.settings.auto_call and self.callbacks is not None:
+            import time as _time
+            if self.store.calls_since(_time.time() - self.settings.auto_call_cooldown) > 0:
+                log.warning("auto-call skipped: another call started in the last %ss", self.settings.auto_call_cooldown)
+                return
             try:
                 self.callbacks.start(decision)
             except Exception as exc:  # never let a telephony problem lose the decision
@@ -249,19 +253,43 @@ class HooksHandler(_Base):
         self.guarded(lambda: self._dispatch("POST"))
 
 
+class BoundedServer(ThreadingHTTPServer):
+    """A threading server that refuses connections beyond a cap instead of spawning a thread per flood."""
+    daemon_threads = True
+
+    def __init__(self, address, handler, max_connections: int = 64):
+        super().__init__(address, handler)
+        self._slots = threading.BoundedSemaphore(max_connections)
+
+    def process_request(self, request, client_address):
+        if not self._slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self._slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
+
+
 def make_servers(app: Surfaces) -> tuple[ThreadingHTTPServer, ThreadingHTTPServer]:
     dash = type("Dash", (DashboardHandler,), {"app": app})
     hooks = type("Hooks", (HooksHandler,), {"app": app})
-    a = ThreadingHTTPServer((app.settings.host, app.settings.port), dash)
-    b = ThreadingHTTPServer((app.settings.host, app.settings.hooks_port), hooks)
-    a.daemon_threads = b.daemon_threads = True
+    a = BoundedServer((app.settings.host, app.settings.port), dash, app.settings.max_connections)
+    b = BoundedServer((app.settings.host, app.settings.hooks_port), hooks, app.settings.max_connections)
     return a, b
 
 
 def serve_forever(app: Surfaces) -> None:
     a, b = make_servers(app)
     threading.Thread(target=b.serve_forever, daemon=True).start()
-    print(f"Dashboard: http://{app.settings.host}:{a.server_address[1]}   Hooks: http://{app.settings.host}:{b.server_address[1]}"
+    print(f"Role: {app.settings.role}   Dashboard: http://{app.settings.host}:{a.server_address[1]}   Hooks: http://{app.settings.host}:{b.server_address[1]}"
           f"   Detector: {app.settings.detector_url}   Telephony: {'ready' if app.settings.twilio_ready else 'not configured'}")
     try:
         a.serve_forever()
