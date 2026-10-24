@@ -1,0 +1,20 @@
+[project]
+name = "doris"
+version = "0.1.0"
+description = "Doris: an AP agent that stops vendor-impersonation fraud before money leaves."
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=2.3.0",
+  "pdfplumber>=0.11",
+  "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "jsonschema>=4", "reportlab>=4"]
+
+[tool.pytest.ini_options]
+testpaths = ["contract", "detector/tests"]
+addopts = "-q"
+
+[tool.setuptools]
+packages = ["detector"]

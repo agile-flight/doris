@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://doris.local/contract/decision.schema.json",
+  "title": "Decision",
+  "description": "One decision about one invoice. Emitted by the detector (Agent A), consumed by every surface (Agent B). Frozen Friday night; change only together.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoice_id", "decision_id", "seq", "created_at",
+    "vendor_claimed", "vendor_id", "payee_name", "amount", "currency",
+    "bank_account_new", "bank_account_on_file", "sender_email", "sender_domain",
+    "signals", "risk_score", "decision", "reasons",
+    "callback_number", "callback_number_on_file_since", "ct_timeline",
+    "llm_rationale", "supersedes", "audit_hash", "prev_hash"
+  ],
+  "properties": {
+    "invoice_id": {"type": "string", "minLength": 1, "description": "Stable id of the invoice; follow-up decisions keep it."},
+    "decision_id": {"type": "string", "minLength": 1},
+    "seq": {"type": "integer", "minimum": 1, "description": "Position in the audit chain."},
+    "created_at": {"type": "string", "format": "date-time"},
+    "vendor_claimed": {"type": ["string", "null"]},
+    "vendor_id": {"type": ["string", "null"], "description": "Matched vendor record on file; null means first-time vendor."},
+    "payee_name": {"type": ["string", "null"]},
+    "amount": {"type": ["number", "null"], "minimum": 0},
+    "currency": {"type": "string", "minLength": 3, "maxLength": 3},
+    "bank_account_new": {"type": ["string", "null"], "pattern": "^\\*{4}[0-9A-Za-z]{2,4}$", "description": "Masked, last digits only. Never the full number."},
+    "bank_account_on_file": {"type": ["string", "null"], "pattern": "^\\*{4}[0-9A-Za-z]{2,4}$"},
+    "sender_email": {"type": ["string", "null"]},
+    "sender_domain": {"type": ["string", "null"]},
+    "signals": {"type": "array", "items": {"$ref": "#/$defs/signal"}},
+    "risk_score": {"type": "number", "minimum": 0, "maximum": 1},
+    "decision": {"enum": ["PAY", "HOLD", "CALLBACK", "BLOCKED"]},
+    "reasons": {"type": "array", "items": {"type": "string"}},
+    "callback_number": {"type": ["string", "null"], "pattern": "^\\+[1-9][0-9]{6,14}$", "description": "E.164. Set only when on file, unchanged, for 90+ days."},
+    "callback_number_on_file_since": {"type": ["string", "null"], "format": "date-time"},
+    "ct_timeline": {"type": "array", "items": {"$ref": "#/$defs/ct_event"}},
+    "llm_rationale": {"type": ["string", "null"]},
+    "supersedes": {"type": ["string", "null"], "description": "decision_id this one replaces (callback result or human review)."},
+    "audit_hash": {"$ref": "#/$defs/sha256"},
+    "prev_hash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "fired", "weight", "detail"],
+      "properties": {
+        "name": {"enum": [
+          "bank_account_changed", "prompt_injection", "vendor_contact_changed",
+          "payee_name_mismatch", "lookalike_domain", "new_domain_certificate",
+          "amount_anomaly", "urgency_language", "llm_judgment",
+          "new_vendor", "callback_result", "human_review"
+        ]},
+        "fired": {"type": "boolean"},
+        "weight": {"enum": ["highest", "high", "medium-high", "medium", "low-medium", "residual", "gate"]},
+        "detail": {"type": ["string", "null"]},
+        "evidence": {"type": "object"}
+      }
+    },
+    "ct_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "kind", "at", "label"],
+      "properties": {
+        "domain": {"type": "string"},
+        "kind": {"enum": ["cert_first_seen", "cert_issued", "vendor_on_file_since", "invoice_received"]},
+        "at": {"type": "string", "format": "date-time"},
+        "label": {"type": "string"}
+      }
+    }
+  }
+}

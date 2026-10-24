@@ -1,0 +1,107 @@
+{
+  "invoice_id": "inv_1044",
+  "decision_id": "dec_8f2c1a9b0004",
+  "seq": 4,
+  "created_at": "2026-10-22T14:52:03Z",
+  "vendor_claimed": "Northwind Traders",
+  "vendor_id": null,
+  "payee_name": "Northwind Traders Inc.",
+  "amount": 1250.0,
+  "currency": "USD",
+  "bank_account_new": "****5520",
+  "bank_account_on_file": null,
+  "sender_email": "ar@northwindtraders.com",
+  "sender_domain": "northwindtraders.com",
+  "signals": [
+    {
+      "name": "bank_account_changed",
+      "fired": false,
+      "weight": "highest",
+      "detail": "No account on file to compare"
+    },
+    {
+      "name": "prompt_injection",
+      "fired": false,
+      "weight": "highest",
+      "detail": "No hidden or AI-addressed text"
+    },
+    {
+      "name": "vendor_contact_changed",
+      "fired": false,
+      "weight": "high",
+      "detail": "No vendor record"
+    },
+    {
+      "name": "payee_name_mismatch",
+      "fired": false,
+      "weight": "high",
+      "detail": "No vendor record to compare"
+    },
+    {
+      "name": "lookalike_domain",
+      "fired": false,
+      "weight": "high",
+      "detail": "No vendor domain on file; northwindtraders.com is not near any vendor on file"
+    },
+    {
+      "name": "new_domain_certificate",
+      "fired": false,
+      "weight": "medium-high",
+      "detail": "First certificate seen 2012-09-14"
+    },
+    {
+      "name": "amount_anomaly",
+      "fired": false,
+      "weight": "medium",
+      "detail": "No payment history"
+    },
+    {
+      "name": "urgency_language",
+      "fired": false,
+      "weight": "low-medium",
+      "detail": "No pressure language"
+    },
+    {
+      "name": "llm_judgment",
+      "fired": false,
+      "weight": "residual",
+      "detail": "risk 0.15: ordinary first invoice, no pressure",
+      "evidence": {
+        "risk": 0.15,
+        "tactics": []
+      }
+    },
+    {
+      "name": "new_vendor",
+      "fired": true,
+      "weight": "gate",
+      "detail": "No record on file for Northwind Traders; first payment is always human-reviewed"
+    }
+  ],
+  "risk_score": 0.12,
+  "decision": "HOLD",
+  "reasons": [
+    "First-time vendor: no record on file, so Doris cannot call a number on file",
+    "Human review required before the first payment"
+  ],
+  "callback_number": null,
+  "callback_number_on_file_since": null,
+  "ct_timeline": [
+    {
+      "domain": "northwindtraders.com",
+      "kind": "cert_first_seen",
+      "at": "2012-09-14T10:05:00Z",
+      "label": "northwindtraders.com first certificate"
+    },
+    {
+      "domain": "northwindtraders.com",
+      "kind": "invoice_received",
+      "at": "2026-10-22T14:52:00Z",
+      "label": "Invoice inv_1044 received"
+    }
+  ],
+  "llm_rationale": "An ordinary first invoice with no pressure language; nothing on file yet to verify it against.",
+  "supersedes": null,
+  "audit_hash": "sha256:5255bd0ac9d46ae59302a3b608028fb3c30fd87de7de70ba694980ca211a2f6f",
+  "prev_hash": "sha256:4010793884f3f200961d562fb7a3d1e4e1e25636caace6564a9383643b7c7982"
+}
