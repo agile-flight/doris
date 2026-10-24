@@ -21,7 +21,8 @@
         "on_file_last4": "1234",
         "new_routing": "0358",
         "on_file_routing": "0358",
-        "claimed_change": false
+        "claimed_change": false,
+        "other_accounts": []
       }
     },
     {
@@ -172,5 +173,5 @@
   "decision_id": "dec_ffb70ef54f95",
   "seq": 5,
   "prev_hash": "sha256:2da6ef64353dd758c4f7dcc8189447f4a562dac01e9825a4799166d33a65ff9b",
-  "audit_hash": "sha256:5d3b1d53d9360c2b429aea8e7582fc931328d1d6d0670f3d3524ede52a7188b1"
+  "audit_hash": "sha256:c49b96a116e16a8d93c5dfd002a69ca835d1aa1cf24c9e72cdb574218bf2a63c"
 }

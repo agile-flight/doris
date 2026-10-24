@@ -27,13 +27,25 @@ NEAR_WHITE = 0.92
 _HIDDEN_CSS = re.compile(
     r"display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0+(?:\.0+)?\s*(?:;|$)"
     r"|font-size\s*:\s*0+(?:\.0+)?\s*(?:px|pt|em)?\s*(?:;|$)"
-    r"|(?<![-\w])color\s*:\s*(?:#fff\b|#ffffff\b|white\b|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*1\s*\))"
     r"|position\s*:\s*absolute;\s*left\s*:\s*-\d{3,}",
     re.IGNORECASE,
 )
+_WHITE_CSS = re.compile(
+    r"(?<![-\w])color\s*:\s*(?:#fff\b|#ffffff\b|white\b|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*1\s*\))",
+    re.IGNORECASE,
+)
+_COLOURED_BG = re.compile(r"background(?:-color)?\s*:\s*(?!\s*(?:#fff\b|#ffffff\b|white\b|transparent\b|none\b|inherit\b))[#a-z]", re.IGNORECASE)
 _FONT_COLOR = re.compile(r"^(#fff\b|#ffffff\b|white)$", re.IGNORECASE)
 _NEAR_WHITE_COLOR = re.compile(r"(?<![-\w])color\s*:\s*#(?:fefefe|fdfdfd|fcfcfc|fbfbfb)\b", re.IGNORECASE)
 _BLOCK_TAGS = {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "blockquote", "pre"}
+
+
+def _part_text(part) -> str:
+    """A text part's content; an unknown or broken charset decodes as UTF-8 with replacement."""
+    try:
+        return part.get_content()
+    except (LookupError, UnicodeError, ValueError, AssertionError):
+        return (part.get_payload(decode=True) or b"").decode("utf-8", errors="replace")
 
 
 # --- colour helpers --------------------------------------------------------------
@@ -68,6 +80,7 @@ class _HTMLText(HTMLParser):
         self.hidden: list[str] = []
         # Stack of (tag_name, is_hidden) so stray end tags don't pop the wrong context.
         self._stack: list[tuple[str, bool]] = []
+        self._bg: list[bool] = []   # parallel to _stack: does this element or an ancestor paint a coloured background?
         self._skip = 0
         self._current_hidden: list[str] = []
 
@@ -85,15 +98,18 @@ class _HTMLText(HTMLParser):
         style = attrs.get("style") or ""
         # <font color=#ffffff> is an HTML attribute, not CSS
         font_color = _FONT_COLOR.search(attrs.get("color", "") or "")
+        bgcolor = (attrs.get("bgcolor") or "").strip().lower()
+        coloured_bg = bool(_COLOURED_BG.search(style)) or (bgcolor not in ("", "#fff", "#ffffff", "white"))
+        on_colour = coloured_bg or (self._bg[-1] if self._bg else False)
+        white = bool(_WHITE_CSS.search(style)) or bool(_NEAR_WHITE_COLOR.search(style)) or bool(font_color)
         hidden = (
             bool(_HIDDEN_CSS.search(style))
-            or bool(_NEAR_WHITE_COLOR.search(style))
-            or bool(font_color)
+            or (white and not on_colour)      # white text on a blue button is visible
             or "hidden" in attrs
-            or attrs.get("aria-hidden") == "true"
         )
         parent_hidden = self._stack[-1][1] if self._stack else False
         self._stack.append((tag, hidden or parent_hidden))
+        self._bg.append(on_colour)
         if tag in _BLOCK_TAGS and not (hidden or parent_hidden):
             self.visible.append("\n")
 
@@ -107,6 +123,7 @@ class _HTMLText(HTMLParser):
                 if self._stack[i][0] == tag:
                     was_hidden = self._stack[i][1]
                     del self._stack[i]
+                    del self._bg[i]
                     parent_hidden = self._stack[-1][1] if self._stack else False
                     if was_hidden and not parent_hidden and self._current_hidden:
                         self.hidden.append(" ".join(self._current_hidden).strip())
@@ -367,9 +384,9 @@ def ingest(raw: bytes | str, *, now: Optional[datetime] = None) -> InboundMessag
             payload = part.get_payload(decode=True) or b""
             attachments.append(Attachment(filename=filename or "attachment", content_type=ctype, data=payload))
         elif ctype == "text/plain":
-            text_parts.append(part.get_content())
+            text_parts.append(_part_text(part))
         elif ctype == "text/html":
-            html_parts.append(part.get_content())
+            html_parts.append(_part_text(part))
 
     body_hidden: list[HiddenSpan] = []
     if text_parts:

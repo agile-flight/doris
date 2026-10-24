@@ -21,7 +21,8 @@
         "on_file_last4": "1234",
         "new_routing": "9593",
         "on_file_routing": "0358",
-        "claimed_change": true
+        "claimed_change": true,
+        "other_accounts": []
       }
     },
     {
@@ -182,6 +183,6 @@
   "supersedes": null,
   "decision_id": "dec_51db47159142",
   "seq": 7,
-  "prev_hash": "sha256:798d69b262956e491e8fe17ce8ea448b20db29e9c816ba784ba3a0174a67570b",
-  "audit_hash": "sha256:2c0152c0f4125447491a803bde50d01a526d93fb6c6004c0866aaabe0dae069c"
+  "prev_hash": "sha256:e15a694aafce6d7e6b5d11eca3354010b378f7578a734be07b7632a73e1218d9",
+  "audit_hash": "sha256:31ade2fa7f3407cbcac569153027e73b346031a9c99c306dd9b93f64ceed1169"
 }

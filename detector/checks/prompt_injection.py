@@ -19,6 +19,16 @@ AI_ADDRESSED = re.compile(
 )
 
 
+# Instruction-like wording. Hidden HTML (email preheaders, tracking text) is common in legitimate
+# templated mail, so it counts as an attack only when it tries to steer the reader or the AI.
+INSTRUCTION = re.compile(
+    r"\b(?:approve[ds]?|approval|pre-?approved|release\s+(?:the\s+)?payment|mark\s+(?:it|this|as)|skip|bypass|override"
+    r"|ignore|disregard|do\s+not\s+(?:flag|verify|check|review|escalate|call)|no\s+need\s+to\s+(?:verify|call|check)"
+    r"|already\s+(?:approved|verified|confirmed)|verified\s+by|whitelist(?:ed)?|auto-?pay|pay\s+(?:immediately|now))\b",
+    re.IGNORECASE,
+)
+
+
 def _meaningful(text: str) -> bool:
     return len(re.sub(r"\W", "", text)) >= 3 and re.search(r"[A-Za-z]", text) is not None
 
@@ -42,7 +52,7 @@ def check_prompt_injection(ctx: CheckContext) -> Signal:
                 findings.append({"kind": kind, "source": "pdf", "line": span.line, "font_size": span.font_size,
                                  "color": span.color, "text": span.text.strip()[:200], "detail": detail})
     for span in ctx.message.body_hidden:
-        if _meaningful(span.text):
+        if _meaningful(span.text) and (AI_ADDRESSED.search(span.text) or INSTRUCTION.search(span.text)):
             kind, detail = _describe(span)
             findings.append({"kind": kind, "source": "html", "line": None, "font_size": None, "color": None,
                              "text": span.text.strip()[:200], "detail": detail})

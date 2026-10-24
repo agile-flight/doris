@@ -3,15 +3,12 @@
 Build doc (plan, pitch, workflow): https://claude.ai/artifact/JydSXjC5Tii6o69WBumyh9
 Repo: https://github.com/agile-flight/doris · Submission deadline: Sun 2026-10-25, 9 AM, at the venue.
 
-## Where it stands (2026-10-23, later)
-Agent A's detector is complete end to end and offline-testable: 211 tests pass, the contract check passes,
+## Where it stands (2026-10-24)
+Agent A's detector is complete end to end and offline-testable: 215 tests pass, the contract check passes,
 the confusion matrix runs (14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design), and the
-DOJ-derived set runs clean (12/12 fraud stopped, 0 blocked outright). The live Claude
-path has never run (no API key on the build machine). A fresh-context adversarial review found 20 gaps; **all 20
-are now fixed** (see the per-finding list below) — the detector no longer accepts a non-boolean callback verdict, a
-callback from an untrusted number, a double resolution, or a reviewed prompt-injection block, and it reads hidden
-text per character (white text sharing a line, render-mode-3 text, HTML attributes, HTML attachments, octet-stream
-PDFs), validates model output against the schema, and holds any invoice above an absolute ceiling.
+DOJ-derived set runs clean (12/12 fraud stopped, 0 blocked outright). The live Claude path has never run
+(no API key on either machine yet). All 20 adversarial-review findings are closed; an independent replay of
+every attack (2026-10-24) found 6 more gaps, now closed too and pinned by `tests/test_review_attacks.py`.
 Agent B's `surfaces/` folder is empty apart from its CLAUDE.md.
 
 Sharing and sync: [COLLABORATION.md](COLLABORATION.md). Repo-contained build summary: [BUILD_PLAN.md](BUILD_PLAN.md).
@@ -83,7 +80,25 @@ Run it with `python -m detector --offline evaluate --testset detector/testset/ca
 reconstruction set written by someone who knows what the detector checks, so treat the catch rate as an upper
 bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and the reason each case is caught.
 
+## Verification pass (2026-10-24): what the replay caught after the fixes
+`tests/review_attacks.py` replays all 38 attacks from the review against the running API and pipeline; every one must fail.
+| Gap | Fix |
+|---|---|
+| A review could approve a `CALLBACK`, skipping the call | review refuses `CALLBACK`; only `callback_result` resolves it |
+| A confirmed callback with no new account number still paid | it now `HOLD`s so a human enters the account given on the call |
+| A second PDF's account number was extracted but never compared | `bank_account_changed` compares every account found |
+| A vendor with no bank on file paid any account | fires: payment to an unverified account |
+| An unknown charset (`x-foo`) returned 500 | text parts decode as UTF-8 with replacement |
+| A hidden email preheader, or white text on a coloured button, `BLOCKED` legitimate mail | white text counts as hidden only on a white or unset background; hidden HTML fires only when it carries instructions |
+
+## Still to do
+- [ ] Agent B: review screen + CT strip, callback (Cartesia + Twilio), forward-to-check door, BLOCKED screen (`surfaces/` is empty).
+- [ ] Run once with `ANTHROPIC_API_KEY` set; check `GET /health` shows `llm_available: true`, then rerun `evaluate` without `--offline`.
+- [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
+
 ## Calls made that interpret the build doc
+- Hidden HTML text in the email body blocks only when it carries instructions (approve, ignore, do not flag, AI-addressed). Templated vendor mail hides preheaders by design; blocking those would wreck the false-positive rate. Hidden PDF text still blocks on any meaningful words.
+- A message that claims a bank change always earns the callback, even when the account's last 4 match the record.
 - A bank change with a number on file 90+ days is always `CALLBACK`, even at a high score; the call is the verification and the best evidence. Only prompt injection blocks outright (score floored at 0.95).
 - Caught means money did not move (BLOCKED, CALLBACK or HOLD). For legitimate invoices the matrix separates blocked outright (real error) from held/called (by design).
 - Email bodies are never stored: the chain holds an intake record (hashes, attachment names) then the Decision.

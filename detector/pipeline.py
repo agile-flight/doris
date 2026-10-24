@@ -155,6 +155,11 @@ class Doris:
                 detail = f"Called {pretty_phone(called)}{since_text}. Vendor AP confirmed the change{quote}"
                 headline = f"Vendor AP at the number on file confirmed the change{quote}"
                 decision, risk = "PAY", 0.1
+                if not original["bank_account_new"]:
+                    # The vendor confirmed a change but the message carried no account number to pay:
+                    # a human enters the account the vendor gave on the call.
+                    decision, risk = "HOLD", 0.5
+                    headline += "; the message had no new account number, so a human must enter the one given on the call"
                 if original["vendor_id"] and original["bank_account_new"]:
                     self.vendors.update_field(original["vendor_id"], "bank_last4", original["bank_account_new"].lstrip("*"),
                                               at=now, source=f"callback confirmed by {pretty_phone(called)}" + (f": {notes}" if notes else ""))
@@ -185,6 +190,8 @@ class Doris:
             follow_up = self._already_resolved(decision_id)
             if follow_up:
                 raise ValueError(f"decision {decision_id} already resolved by {follow_up}")
+            if original["decision"] == "CALLBACK":
+                raise ValueError("a CALLBACK is resolved by calling the number on file (callback_result), not by review")
             # A prompt-injection BLOCKED is a hard block: no human review can turn it into PAY.
             fired = {s["name"] for s in original.get("signals", []) if s.get("fired")}
             if approve and "prompt_injection" in fired:

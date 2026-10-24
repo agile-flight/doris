@@ -71,8 +71,24 @@ def test_bank_change_fires_when_last4_differs():
 
 
 def test_bank_change_not_fired_when_same_account():
-    s = check_bank_change(ctx(inv=invoice(bank_account_last4="1234", bank_change_requested=True)))
+    s = check_bank_change(ctx(inv=invoice(bank_account_last4="1234", bank_change_requested=False)))
     assert not s.fired and "unchanged" in s.detail
+
+
+def test_claimed_change_with_same_account_still_gets_the_call():
+    s = check_bank_change(ctx(inv=invoice(bank_account_last4="1234", bank_change_requested=True)))
+    assert s.fired and "says bank details changed" in s.detail
+
+
+def test_any_account_in_any_attachment_counts():
+    s = check_bank_change(ctx(inv=invoice(bank_account_last4="1234", other_account_last4=["8888"])))
+    assert s.fired and s.evidence["new_last4"] == "8888"
+
+
+def test_no_account_on_file_is_not_a_pass():
+    v = acme(bank_last4=None)
+    s = check_bank_change(ctx(vendor=v, inv=invoice(bank_account_last4="8841")))
+    assert s.fired and "unverified" in s.detail
 
 
 def test_bank_change_fires_on_claimed_change_without_number():

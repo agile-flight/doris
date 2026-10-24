@@ -50,3 +50,11 @@ frictions). It is a reconstruction set, so treat its catch rate as an upper boun
 `contract/samples/*.json` were regenerated from the pipeline, so their hashes and the two field values above
 differ from before. Re-pull `contract/` before building against it.
 
+
+## 2026-10-24 — verification pass (Agent A)
+Replayed every review attack (`detector/tests/review_attacks.py`, now a test); 6 gaps remained and are closed.
+What B reads that changed (shape unchanged, samples regenerated):
+- `POST /decisions/{id}/review` on a `CALLBACK` is refused (400): resolve it with `callback_result`.
+- A confirmed `callback_result` with no `bank_account_new` returns a `HOLD` follow-up (contract README updated).
+- `bank_account_changed.evidence` gained `other_accounts`; a claimed change with the same last 4 now fires (`CALLBACK`).
+- Hidden HTML preheaders and white button text on coloured backgrounds no longer block.

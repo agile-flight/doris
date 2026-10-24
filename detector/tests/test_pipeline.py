@@ -138,7 +138,8 @@ def test_callback_confirmed_pays_and_updates_the_record(doris):
     routing_edit = next(e for e in edits if e.payload["field"] == "routing_last4")
     assert routing_edit.payload["source"].startswith("callback confirmed")
     again = doris.check(raw("bank_change_lookalike.eml"))
-    assert not signal(again, "bank_account_changed")["fired"]
+    ev = next(s for s in again["signals"] if s["name"] == "bank_account_changed")["evidence"]
+    assert ev["new_last4"] == ev["on_file_last4"] == "8841"   # the verified account is now the one on file
     assert doris.verify().ok
 
 

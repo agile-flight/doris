@@ -39,7 +39,8 @@ In this order; the first that applies wins.
 6. Otherwise `PAY` below 0.30, `HOLD` from 0.30.
 
 A callback result or human review produces a follow-up Decision (same `invoice_id`, `supersedes`
-set) that is `PAY` or `BLOCKED`.
+set) that is `PAY` or `BLOCKED`, or `HOLD` when the vendor confirmed a change but the message carried no
+account number. A `CALLBACK` is resolved only by `callback_result`, never by review, and only once.
 
 ## The audit hash
 
