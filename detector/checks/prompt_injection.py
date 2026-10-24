@@ -24,14 +24,13 @@ def _meaningful(text: str) -> bool:
 
 
 def _describe(span: HiddenSpan) -> tuple[str, str]:
-    quote = span.text.strip()[:90]
     if span.source == "pdf":
         if span.reason == "white_text":
-            return "white_text", f'white text, line {span.line}: "{quote}"'
+            return "white_text", f'white text, line {span.line}'
         if span.reason == "tiny_text":
-            return "tiny_text", f'tiny text ({span.font_size}pt), line {span.line}: "{quote}"'
-        return span.reason, f'off-page text, line {span.line}: "{quote}"'
-    return "css_hidden", f'hidden HTML text: "{quote}"'
+            return "tiny_text", f'tiny text ({span.font_size}pt), line {span.line}'
+        return span.reason, f'off-page text, line {span.line}'
+    return "css_hidden", "hidden HTML text"
 
 
 def check_prompt_injection(ctx: CheckContext) -> Signal:

@@ -15,10 +15,12 @@
       "name": "bank_account_changed",
       "fired": true,
       "weight": "highest",
-      "detail": "Requests payment to ****8841; account on file is ****1234",
+      "detail": "Requests payment to ****8841; account on file is ****1234; Routing ****9593; routing on file is ****0358",
       "evidence": {
         "new_last4": "8841",
         "on_file_last4": "1234",
+        "new_routing": "9593",
+        "on_file_routing": "0358",
         "claimed_change": true
       }
     },
@@ -180,6 +182,6 @@
   "supersedes": null,
   "decision_id": "dec_51db47159142",
   "seq": 7,
-  "prev_hash": "sha256:c96afcbbf8a5e6ac58dd1bcf52c99012789983c708a3144f1d2687bf15785bc3",
-  "audit_hash": "sha256:fc6e1ce43cade188d679d3dc4f22847ef1a05cf2172156df9e1c9a434abb2994"
+  "prev_hash": "sha256:798d69b262956e491e8fe17ce8ea448b20db29e9c816ba784ba3a0174a67570b",
+  "audit_hash": "sha256:2c0152c0f4125447491a803bde50d01a526d93fb6c6004c0866aaabe0dae069c"
 }

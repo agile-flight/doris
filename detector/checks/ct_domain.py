@@ -87,7 +87,7 @@ def check_new_domain_certificate(ctx: CheckContext) -> Signal:
     if not certs:
         return Signal(NAME, False, WEIGHT, f"No certificate has ever been logged for {domain}", {"status": "ok", "domain": domain, "none_found": True, "count": 0})
     first = min(certs)
-    age_days = (ctx.message.received_at - first).days
+    age_days = (ctx.now - first).days
     evidence = {"status": "ok", "domain": domain, "none_found": False, "first_seen": iso_z(first), "age_days": age_days, "count": len(certs)}
     if age_days < ctx.settings.new_cert_days:
         return Signal(NAME, True, WEIGHT, f"First certificate for {domain} seen {first:%Y-%m-%d %H:%M} UTC, {age_days} days before the invoice", evidence)

@@ -18,7 +18,6 @@ from datetime import datetime
 from typing import Optional
 
 from .checks import Signal
-from .checks.prompt_injection import AI_ADDRESSED
 from .config import Settings
 from .models import VendorOnFile
 
@@ -78,15 +77,16 @@ def _reason_for(s: Signal, lookalike_fired: bool) -> Optional[str]:
         return f"Bank account change requested: ****{on_file} to ****{new}" if new and on_file else s.detail
     if s.name == "prompt_injection":
         findings = ev.get("findings") or []
-        text = findings[0]["text"] if findings else ""
-        suffix = " addressed to an AI" if AI_ADDRESSED.search(text or "") else ""
-        kind, line = ev.get("kind"), ev.get("line")
-        where = {"white_text": f"Hidden white text on line {line}", "tiny_text": f"Hidden tiny text on line {line}",
-                 "off_page": f"Hidden off-page text on line {line}", "css_hidden": "Hidden HTML text",
-                 "ai_addressed_text": "Text"}.get(kind, "Hidden text")
-        if kind == "ai_addressed_text":
-            suffix = " addressed to an AI"
-        return f'{where}{suffix}: "{_quote(text)}"'
+        kind = ev.get("kind") or (findings[0]["kind"] if findings else None)
+        line = ev.get("line")
+        where = {"white_text": f"Hidden white text on line {line}" if line else "Hidden white text",
+                 "tiny_text": f"Hidden tiny text on line {line}" if line else "Hidden tiny text",
+                 "off_page": f"Hidden off-page text on line {line}" if line else "Hidden off-page text",
+                 "css_hidden": "Hidden HTML text",
+                 "ai_addressed_text": "Text addressed to an AI"}.get(kind, "Hidden text")
+        count = ev.get("count", len(findings))
+        suffix = f" ({count} spans)" if count > 1 else ""
+        return f"{where}{suffix}"
     if s.name == "lookalike_domain":
         who = "Reply-to domain" if ev.get("field") == "reply_to" else "Sender domain"
         return f"{who} {ev.get('domain')} is a lookalike of {ev.get('on_file_domain')} ({ev.get('method')})"

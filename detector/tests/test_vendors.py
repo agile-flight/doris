@@ -64,12 +64,27 @@ def test_contact_changed_under_90_days_ago_is_never_used_for_the_callback(store)
     assert signal.fired and "89 days ago" in signal.detail
 
 
-def test_contact_changed_90_days_ago_is_on_file_again(store):
+def test_contact_changed_90_days_ago_is_on_file_again(tmp_path):
+    """A number we recorded 90+ days ago is trusted again, even though it was once changed."""
+    clock = [NOW - timedelta(days=91)]
+    store = VendorStore(tmp_path / "doris.db", audit=AuditLog(tmp_path / "doris.db"), now=lambda: clock[0])
     create_acme(store)
-    store.update_field("ven_acme_supply", "phone", "+19995550000", at=NOW - timedelta(days=90), source="verified by call")
+    changed_at = NOW - timedelta(days=90)
+    store.update_field("ven_acme_supply", "phone", "+19995550000", at=changed_at, source="verified by call")
+    clock[0] = NOW
     v = store.get("ven_acme_supply")
-    assert v.trusted_phone(NOW, 90) == ("+19995550000", NOW - timedelta(days=90))
+    assert v.trusted_phone(NOW, 90)[0] == "+19995550000"
     assert not check_vendor_contact_changed(ctx(vendor=v)).fired
+
+
+def test_backdated_edit_is_not_trusted_immediately(store):
+    """The attack: record a 'change' with a 200-day-old `since` today. Trust must come from
+    when we recorded it, not from the date the edit claims."""
+    create_acme(store)
+    store.update_field("ven_acme_supply", "phone", "+19995550000", at=NOW - timedelta(days=200), source="email request")
+    v = store.get("ven_acme_supply")
+    assert v.phone == "+19995550000" and v.phone_since == NOW - timedelta(days=200)
+    assert v.trusted_phone(NOW, 90) == (None, None)
 
 
 def test_old_number_is_not_used_after_a_recent_change(store):
@@ -101,7 +116,8 @@ def test_bank_edit_updates_bank_since_and_is_logged(store):
     store.update_field("ven_acme_supply", "bank_last4", "8841", at=at, source="callback confirmed")
     v = store.get("ven_acme_supply")
     assert v.bank_last4 == "8841" and v.bank_since == at
-    assert v.last_contact_change_at is None  # bank is not a contact field
+    # a bank-account edit is a vendor-record edit and must raise the score
+    assert v.last_contact_change_at == at and v.last_contact_change_field == "bank_last4"
     assert store.audit.records(kind="vendor_edit")[-1].payload["field"] == "bank_last4"
 
 
@@ -138,6 +154,35 @@ def test_lookalike_domain_does_not_match_by_domain_alone(store):
     create_acme(store)
     # Only the exact domain matches by domain; a lookalike must earn the match by name or payee.
     assert store.match(vendor_claimed="Totally Different", sender_domain="acmesupply-billing.com", payee_name="Someone Else") is None
+
+
+def test_create_rejects_non_e164_phone(store):
+    with pytest.raises(ValueError, match="E.164"):
+        store.create("ven_bad", "Bad Co", domain=None, phone="415-555-0123", email=None,
+                     contact_name=None, bank_last4=None, since=SINCE)
+    with pytest.raises(ValueError, match="E.164"):
+        store.create("ven_bad2", "Bad Co", domain=None, phone="not a phone", email=None,
+                     contact_name=None, bank_last4=None, since=SINCE)
+    # a valid E.164 number is accepted
+    store.create("ven_ok", "OK Co", domain=None, phone="+14155550123", email=None,
+                 contact_name=None, bank_last4=None, since=SINCE)
+    assert store.get("ven_ok").phone == "+14155550123"
+
+
+def test_update_field_rejects_bad_values(store):
+    create_acme(store)
+    with pytest.raises(ValueError, match="E.164"):
+        store.update_field("ven_acme_supply", "phone", "415-555-0123", at=NOW, source="email request")
+    with pytest.raises(ValueError, match="bank_last4"):
+        store.update_field("ven_acme_supply", "bank_last4", "1234567890123456", at=NOW, source="email request")
+    # the record is unchanged after a rejected edit
+    assert store.get("ven_acme_supply").phone == "+14155550123"
+
+
+def test_create_rejects_bad_bank_last4(store):
+    with pytest.raises(ValueError, match="bank_last4"):
+        store.create("ven_bad", "Bad Co", domain=None, phone=None, email=None,
+                     contact_name=None, bank_last4="1", since=SINCE)
 
 
 def test_known_domains_and_listing(store):

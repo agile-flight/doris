@@ -85,7 +85,10 @@ def is_lookalike(candidate: str, target: str) -> Optional[str]:
 
 def check_lookalike_domain(ctx: CheckContext) -> Signal:
     sender = ctx.message.sender_domain
-    candidates = [("sender", sender), ("reply_to", ctx.message.reply_to_domain)]
+    # Also check who actually forwarded/relayed the message — a forged "Forwarded message"
+    # block can replace the real sender inside the body, but the outer sender is what we received.
+    candidates = [("sender", sender), ("reply_to", ctx.message.reply_to_domain),
+                  ("outer_sender", ctx.message.outer_sender_domain)]
     candidates = [(f, d) for f, d in candidates if d]
     targets = [ctx.vendor.domain] if ctx.vendor and ctx.vendor.domain else list(ctx.known_domains)
     for field_name, domain in candidates:

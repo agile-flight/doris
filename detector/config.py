@@ -33,7 +33,9 @@ class Settings:
     crtsh_timeout: float = 6.0
     block_threshold: float = 0.85
     hold_threshold: float = 0.30
-    amount_anomaly_ratio: float = 2.5
+    amount_anomaly_ratio: float = 2.5   # > this x median flags amount_anomaly
+    amount_extreme_ratio: float = 3.0   # > this x max history is extreme -> HOLD on its own
+    amount_hold_ceiling: float = 100_000.0  # any invoice above this is held for a human
     llm_weight: float = 0.5         # how much of the residual the LLM judgment can claim
     weights: dict[str, float] = field(default_factory=lambda: dict(WEIGHTS))
 

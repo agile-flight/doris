@@ -27,6 +27,7 @@ from .pipeline import Doris
 log = logging.getLogger("doris.api")
 CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type"}
+MAX_BODY_BYTES = 25 * 1024 * 1024  # 25 MB: a raw email plus a PDF attachment
 
 
 def _jsonable(value: Any) -> Any:
@@ -57,7 +58,14 @@ def make_handler(doris: Doris):
             self.wfile.write(data)
 
         def _body(self) -> bytes:
-            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except (TypeError, ValueError):
+                raise ValueError("invalid Content-Length header")
+            if length < 0:
+                raise ValueError(f"invalid Content-Length: {length}")
+            if length > MAX_BODY_BYTES:
+                raise ValueError(f"body too large ({length} bytes; limit {MAX_BODY_BYTES})")
             return self.rfile.read(length) if length else b""
 
         def do_OPTIONS(self):
@@ -67,6 +75,17 @@ def make_handler(doris: Doris):
             self.end_headers()
 
         def do_GET(self):
+            try:
+                self._get()
+            except KeyError as exc:
+                self._send(404, {"error": f"no decision {exc.args[0] if exc.args else ''}"})
+            except (ValueError, json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+                self._send(400, {"error": str(exc)[:300]})
+            except Exception as exc:  # never leak a traceback to the caller
+                log.exception("request failed")
+                self._send(500, {"error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+
+        def _get(self):
             url = urlparse(self.path)
             path = url.path.rstrip("/") or "/"
             if path == "/health":
@@ -74,8 +93,14 @@ def make_handler(doris: Doris):
                                         "llm_available": doris.llm.available, "llm_disabled_reason": doris.llm.disabled_reason,
                                         "records": doris.audit.head()[0]})
             if path == "/decisions":
-                limit = int((parse_qs(url.query).get("limit") or ["50"])[0])
-                return self._send(200, doris.list_decisions(limit=limit))
+                raw_limit = (parse_qs(url.query).get("limit") or ["50"])[0]
+                try:
+                    limit = int(raw_limit)
+                except (TypeError, ValueError):
+                    return self._send(400, {"error": f'limit must be an integer, got {raw_limit!r}'})
+                if limit < 1:
+                    return self._send(400, {"error": "limit must be >= 1"})
+                return self._send(200, doris.list_decisions(limit=min(limit, 1000)))
             m = re.fullmatch(r"/decisions/([^/]+)", path)
             if m:
                 decision = doris.get_decision(m.group(1))
@@ -93,19 +118,27 @@ def make_handler(doris: Doris):
 
         def do_POST(self):
             path = urlparse(self.path).path.rstrip("/")
-            raw = self._body()
-            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             try:
+                raw = self._body()
+                ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
                 if path == "/check":
                     if ctype == "application/json":
                         body = json.loads(raw.decode("utf-8"))
-                        text = body.get("text") if isinstance(body, dict) else None
-                        if not text:
-                            return self._send(400, {"error": 'JSON body needs "text" (the email or forwarded message)'})
+                        if not isinstance(body, dict):
+                            return self._send(400, {"error": "JSON object expected"})
+                        text = body.get("text")
+                        if not isinstance(text, str) or not text.strip():
+                            return self._send(400, {"error": 'JSON body needs "text" (a string: the email or forwarded message)'})
+                        invoice_id = body.get("invoice_id")
+                        if invoice_id is not None and (isinstance(invoice_id, bool) or not isinstance(invoice_id, (str, int, float))):
+                            return self._send(400, {"error": '"invoice_id" must be a string'})
                         extra = []
-                        if body.get("pdf_base64"):
-                            extra.append(Attachment(body.get("pdf_filename") or "attachment.pdf", "application/pdf", base64.b64decode(body["pdf_base64"])))
-                        return self._send(200, doris.check(text, extra_attachments=extra, invoice_id=body.get("invoice_id")))
+                        if body.get("pdf_base64") is not None:
+                            pdf = body["pdf_base64"]
+                            if not isinstance(pdf, str):
+                                return self._send(400, {"error": '"pdf_base64" must be a base64 string'})
+                            extra.append(Attachment(body.get("pdf_filename") or "attachment.pdf", "application/pdf", base64.b64decode(pdf)))
+                        return self._send(200, doris.check(text, extra_attachments=extra, invoice_id=invoice_id))
                     if not raw.strip():
                         return self._send(400, {"error": "empty body"})
                     return self._send(200, doris.check(raw))
@@ -117,11 +150,18 @@ def make_handler(doris: Doris):
                     if m.group(2) == "callback_result":
                         if "vendor_confirmed" not in body:
                             return self._send(400, {"error": '"vendor_confirmed" (bool) is required'})
-                        return self._send(200, doris.resolve_callback(m.group(1), vendor_confirmed=bool(body["vendor_confirmed"]),
-                                                                      notes=str(body.get("notes") or ""), called=body.get("called")))
+                        if not isinstance(body["vendor_confirmed"], bool):
+                            return self._send(400, {"error": '"vendor_confirmed" must be a boolean (true/false)'})
+                        called = body.get("called")
+                        if called is not None and not isinstance(called, str):
+                            return self._send(400, {"error": '"called" must be a string (E.164)'})
+                        return self._send(200, doris.resolve_callback(m.group(1), vendor_confirmed=body["vendor_confirmed"],
+                                                                      notes=str(body.get("notes") or ""), called=called))
                     if "approve" not in body:
                         return self._send(400, {"error": '"approve" (bool) is required'})
-                    return self._send(200, doris.resolve_review(m.group(1), approve=bool(body["approve"]),
+                    if not isinstance(body["approve"], bool):
+                        return self._send(400, {"error": '"approve" must be a boolean (true/false)'})
+                    return self._send(200, doris.resolve_review(m.group(1), approve=body["approve"],
                                                                 reviewer=str(body.get("reviewer") or ""), notes=str(body.get("notes") or "")))
                 return self._send(404, {"error": f"no route {path}"})
             except KeyError as exc:

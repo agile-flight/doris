@@ -19,6 +19,8 @@
       "evidence": {
         "new_last4": "1234",
         "on_file_last4": "1234",
+        "new_routing": "0358",
+        "on_file_routing": "0358",
         "claimed_change": false
       }
     },
@@ -169,6 +171,6 @@
   "supersedes": null,
   "decision_id": "dec_ffb70ef54f95",
   "seq": 5,
-  "prev_hash": "sha256:24ec49527cd985d37e609ae0df2bf2f0b736eb20b342fa9672f7468e87e0309d",
-  "audit_hash": "sha256:1778cdf485eb5abbe834e906c59664b039790eb30ce5804f47192b9021ac6e7a"
+  "prev_hash": "sha256:2da6ef64353dd758c4f7dcc8189447f4a562dac01e9825a4799166d33a65ff9b",
+  "audit_hash": "sha256:5d3b1d53d9360c2b429aea8e7582fc931328d1d6d0670f3d3524ede52a7188b1"
 }

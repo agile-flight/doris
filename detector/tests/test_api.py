@@ -84,6 +84,66 @@ def test_errors(base):
     assert status == 400
 
 
+def test_callback_result_rejects_non_boolean_vendor_confirmed(base):
+    _, first, _ = call(base, "POST", "/check", (FIXTURES / "emails" / "bank_change_lookalike.eml").read_bytes(), "message/rfc822")
+    decision_id = first["decision_id"]
+    # string "false" is truthy under bool() — must be rejected
+    status, body, _ = call(base, "POST", f"/decisions/{decision_id}/callback_result",
+                           {"vendor_confirmed": "false", "notes": "x"})
+    assert status == 400 and "boolean" in body["error"].lower()
+    # integer 1 must be rejected too
+    status, body, _ = call(base, "POST", f"/decisions/{decision_id}/callback_result",
+                           {"vendor_confirmed": 1, "notes": "x"})
+    assert status == 400 and "boolean" in body["error"].lower()
+    # null must be rejected
+    status, body, _ = call(base, "POST", f"/decisions/{decision_id}/callback_result",
+                           {"vendor_confirmed": None, "notes": "x"})
+    assert status == 400 and "boolean" in body["error"].lower()
+    # real booleans still work
+    status, follow, _ = call(base, "POST", f"/decisions/{decision_id}/callback_result",
+                             {"vendor_confirmed": False, "notes": "we never changed our bank"})
+    assert status == 200 and follow["decision"] == "BLOCKED"
+
+
+def test_review_rejects_non_boolean_approve(base):
+    _, held, _ = call(base, "POST", "/check", (FIXTURES / "emails" / "new_vendor_northwind.eml").read_bytes(), "message/rfc822")
+    decision_id = held["decision_id"]
+    status, body, _ = call(base, "POST", f"/decisions/{decision_id}/review",
+                           {"approve": "yes", "reviewer": "judge", "notes": "x"})
+    assert status == 400 and "boolean" in body["error"].lower()
+    status, body, _ = call(base, "POST", f"/decisions/{decision_id}/review",
+                           {"approve": 0, "reviewer": "judge", "notes": "x"})
+    assert status == 400 and "boolean" in body["error"].lower()
+    status, reviewed, _ = call(base, "POST", f"/decisions/{decision_id}/review",
+                               {"approve": True, "reviewer": "judge", "notes": "PO matches"})
+    assert status == 200 and reviewed["decision"] == "PAY"
+
+
+def test_bad_query_and_body_types_return_400_not_500(base):
+    assert call(base, "GET", "/decisions?limit=abc")[0] == 400
+    assert call(base, "GET", "/decisions?limit=0")[0] == 400
+    status, body, _ = call(base, "POST", "/check", {"text": 123})
+    assert status == 400 and "text" in body["error"]
+    status, body, _ = call(base, "POST", "/check", {"text": "hello", "invoice_id": {"a": 1}})
+    assert status == 400
+    status, body, _ = call(base, "POST", "/check", {"text": "hello", "pdf_base64": 5})
+    assert status == 400
+    status, body, _ = call(base, "POST", "/check", ["not", "an", "object"])
+    assert status == 400
+
+
+def test_integer_invoice_id_is_coerced_to_string(base):
+    status, d, _ = call(base, "POST", "/check", {"text": "From: Acme Supply <billing@acmesupply.com>\nSubject: INV-1\n\ntotal due $10.00", "invoice_id": 42})
+    assert status == 200 and d["invoice_id"] == "42"
+
+
+def test_callback_result_rejects_non_string_called(base):
+    _, first, _ = call(base, "POST", "/check", (FIXTURES / "emails" / "bank_change_lookalike.eml").read_bytes(), "message/rfc822")
+    status, body, _ = call(base, "POST", f"/decisions/{first['decision_id']}/callback_result",
+                           {"vendor_confirmed": False, "called": 5})
+    assert status == 400 and "called" in body["error"]
+
+
 def test_health_and_cors_preflight(base):
     status, body, _ = call(base, "GET", "/health")
     assert status == 200 and body["ok"] is True and body["offline"] is True

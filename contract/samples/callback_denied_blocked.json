@@ -66,11 +66,13 @@
   "sender_email": "billing@acmesupply-billing.com",
   "signals": [
     {
-      "detail": "Requests payment to ****8841; account on file is ****1234",
+      "detail": "Requests payment to ****8841; account on file is ****1234; Routing ****9593; routing on file is ****0358",
       "evidence": {
         "claimed_change": true,
         "new_last4": "8841",
-        "on_file_last4": "1234"
+        "new_routing": "9593",
+        "on_file_last4": "1234",
+        "on_file_routing": "0358"
       },
       "fired": true,
       "name": "bank_account_changed",
@@ -191,6 +193,6 @@
   "vendor_id": "ven_acme_supply",
   "decision_id": "dec_36f6ccba382d",
   "seq": 14,
-  "prev_hash": "sha256:6452aedb5847f9c808a77266552effdbd0644542e90d799a3ae74c1988af803a",
-  "audit_hash": "sha256:6e0eefd7ba07f41c62d3588079d6d17f638524eb459902c5af1c910d1dfc4bb6"
+  "prev_hash": "sha256:64fe293ceefd78955938ea42d38c0655af5105d162036862867d8dd12ad7353d",
+  "audit_hash": "sha256:8b7d82828564e2ca02f199f62c3b2488b1e262d994cd265b0e5f6b789aa9dadc"
 }

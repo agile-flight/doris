@@ -69,7 +69,10 @@ class Doris:
         message.attachments.extend(extra_attachments)
         docs = extract_documents(message)
         invoice, method = extract(message, docs, self.llm)
-        invoice_id = invoice_id or invoice.invoice_number or "inv_" + message.raw_sha256[:12]
+        if invoice_id is None or invoice_id == "":
+            invoice_id = invoice.invoice_number or "inv_" + message.raw_sha256[:12]
+        else:
+            invoice_id = str(invoice_id)   # never let a non-string reach the frozen schema
 
         with self._lock:
             # Intake record: hashes only. Email bodies are never stored after the check.
@@ -88,6 +91,13 @@ class Doris:
             callback_number, callback_since = vendor.trusted_phone(now, self.settings.on_file_days) if vendor else (None, None)
             verdict = score(signals, llm_risk=judgment.risk, callback_number=callback_number, callback_since=callback_since,
                             vendor=vendor, settings=self.settings)
+            # Unreadable attachments force HOLD: never silently drop a PDF the pipeline cannot read.
+            doc_errors = [d for d in docs if d.error]
+            if doc_errors and verdict.decision == "PAY":
+                verdict.decision = "HOLD"
+                verdict.risk_score = max(verdict.risk_score, self.settings.hold_threshold)
+                names = ", ".join(d.name or "unnamed attachment" for d in doc_errors)
+                verdict.reasons.append(f"Attachment {names} could not be read; human review required")
             decision: dict[str, Any] = {
                 "invoice_id": invoice_id,
                 "created_at": iso_z(now),
@@ -114,6 +124,13 @@ class Doris:
 
     # --- follow-ups ---------------------------------------------------------------------
 
+    def _already_resolved(self, decision_id: str) -> Optional[str]:
+        """Return the decision_id of a follow-up that already supersedes this one, or None."""
+        for rec in self.audit.records(kind="decision", newest_first=True):
+            if rec.payload.get("supersedes") == decision_id:
+                return rec.payload.get("decision_id")
+        return None
+
     def resolve_callback(self, decision_id: str, *, vendor_confirmed: bool, notes: str = "", called: Optional[str] = None) -> dict[str, Any]:
         """Record what the vendor said at the number on file. Denied -> BLOCKED; confirmed -> PAY
         and the new account becomes the account on file (a versioned, audited edit)."""
@@ -121,10 +138,16 @@ class Doris:
             original = self.get_decision(decision_id)
             if original is None:
                 raise KeyError(decision_id)
+            follow_up = self._already_resolved(decision_id)
+            if follow_up:
+                raise ValueError(f"decision {decision_id} already resolved by {follow_up}")
             if original["decision"] != "CALLBACK":
                 raise ValueError(f"decision {decision_id} is {original['decision']}, not CALLBACK")
             now = self.now()
-            called = called or original["callback_number"]
+            trusted = original["callback_number"]
+            if called is not None and called != trusted:
+                raise ValueError(f"called {called} does not match the number on file {trusted}")
+            called = called or trusted
             since = original.get("callback_number_on_file_since")
             since_text = f" (on file since {since[:10]})" if since else ""
             quote = f': "{notes}"' if notes else ""
@@ -135,6 +158,15 @@ class Doris:
                 if original["vendor_id"] and original["bank_account_new"]:
                     self.vendors.update_field(original["vendor_id"], "bank_last4", original["bank_account_new"].lstrip("*"),
                                               at=now, source=f"callback confirmed by {pretty_phone(called)}" + (f": {notes}" if notes else ""))
+                    # Also update the routing number on file from the original check's evidence.
+                    new_routing = None
+                    for s in original.get("signals", []):
+                        if s.get("name") == "bank_account_changed" and s.get("fired"):
+                            new_routing = s.get("evidence", {}).get("new_routing")
+                            break
+                    if new_routing:
+                        self.vendors.update_field(original["vendor_id"], "routing_last4", new_routing,
+                                                  at=now, source=f"callback confirmed by {pretty_phone(called)}" + (f": {notes}" if notes else ""))
             else:
                 detail = f"Called {pretty_phone(called)}{since_text}. Vendor AP said{quote}" if notes else f"Called {pretty_phone(called)}{since_text}. Vendor AP did not confirm the change"
                 headline = f"Vendor AP at the number on file said{quote}" if notes else "Vendor AP at the number on file did not confirm the change"
@@ -150,6 +182,13 @@ class Doris:
             original = self.get_decision(decision_id)
             if original is None:
                 raise KeyError(decision_id)
+            follow_up = self._already_resolved(decision_id)
+            if follow_up:
+                raise ValueError(f"decision {decision_id} already resolved by {follow_up}")
+            # A prompt-injection BLOCKED is a hard block: no human review can turn it into PAY.
+            fired = {s["name"] for s in original.get("signals", []) if s.get("fired")}
+            if approve and "prompt_injection" in fired:
+                raise ValueError("prompt_injection BLOCKED is a hard block and cannot be overridden by review")
             now = self.now()
             verb = "approved" if approve else "rejected"
             detail = f"Reviewed by {reviewer or 'a reviewer'}: {verb}" + (f" ({notes})" if notes else "")

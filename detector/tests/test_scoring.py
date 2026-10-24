@@ -61,7 +61,7 @@ def test_white_text_invoice_scores_maximum_risk_and_blocks(fixtures):
     assert verdict.decision == "BLOCKED"
     assert verdict.risk_score >= 0.95
     assert verdict.hard_block is True
-    assert verdict.reasons[0].startswith("Hidden white text on line 14 addressed to an AI")
+    assert verdict.reasons[0].startswith("Hidden white text on line 14")
     assert any("Blue Horizon Automobile LLC" in r for r in verdict.reasons)
 
 

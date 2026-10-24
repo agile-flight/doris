@@ -114,6 +114,18 @@ def find_account_last4(text: str) -> Optional[str]:
     return None
 
 
+def find_all_account_last4(text: str) -> list[str]:
+    """Every distinct account last-4 in reading order, so a second account is never missed."""
+    out: list[str] = []
+    for m in _ACCOUNT.finditer(text):
+        digits = _digits(m.group(1))
+        if 6 <= len(digits) <= 17:
+            last4 = digits[-4:]
+            if last4 not in out:
+                out.append(last4)
+    return out
+
+
 def find_routing_last4(text: str) -> Optional[str]:
     m = _ROUTING.search(text)
     return m.group(1)[-4:] if m else None
@@ -158,6 +170,55 @@ def detect_currency(text: str) -> str:
     return "USD"
 
 
+# --- normalisation of model output --------------------------------------------------
+
+_ISO_CURRENCY = re.compile(r"[A-Za-z]{3}")
+_SYMBOL_TO_ISO = {"$": "USD", "US$": "USD", "USD": "USD", "€": "EUR", "EUR": "EUR", "£": "GBP", "GBP": "GBP"}
+
+
+def normalise_currency(value) -> str:
+    """Anything the model returns becomes a 3-letter ISO 4217 code."""
+    raw = str(value or "").strip()
+    if raw.upper() in _SYMBOL_TO_ISO:
+        return _SYMBOL_TO_ISO[raw.upper()]
+    if _ISO_CURRENCY.fullmatch(raw):
+        return raw.upper()
+    return "USD"
+
+
+def normalise_last4(value) -> Optional[str]:
+    """Reduce whatever the model returned to at most four alphanumerics: the last four."""
+    if value is None:
+        return None
+    cleaned = re.sub(r"[^0-9A-Za-z]", "", str(value))
+    return cleaned[-4:] if cleaned else None
+
+
+def normalise_extraction(inv: ExtractedInvoice) -> ExtractedInvoice:
+    """Clamp model output to what the contract can hold: 4-char last4, ISO currency, amount >= 0.
+
+    The schema rejects a full account number, a `$` symbol or a negative amount, so a raw
+    model response could otherwise break the whole pipeline.
+    """
+    amount = inv.amount
+    if amount is not None:
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            amount = None
+        else:
+            if amount < 0 or amount != amount:  # negative or NaN
+                amount = None
+    others = [n for n in (normalise_last4(v) for v in (inv.other_account_last4 or [])) if n]
+    return inv.model_copy(update={
+        "amount": amount,
+        "currency": normalise_currency(inv.currency),
+        "bank_account_last4": normalise_last4(inv.bank_account_last4),
+        "routing_number_last4": normalise_last4(inv.routing_number_last4),
+        "other_account_last4": others,
+    })
+
+
 _COMPANY_SUFFIX = re.compile(r"\b(?:Co\.?|Inc\.?|LLC|Ltd\.?|Corp\.?|Corporation|Company|GmbH|Supply|Traders|Industries|Services)\b", re.IGNORECASE)
 
 
@@ -185,13 +246,18 @@ def extract_offline(message: InboundMessage, docs: list[DocumentText]) -> Extrac
     amount = find_amount(doc_text) if doc_text else None
     if amount is None:
         amount = find_amount(message.body_text)
+    # Every account number across every attachment and the body counts, not just the first.
+    primary_account = find_account_last4(doc_text) or find_account_last4(message.body_text) or None
+    all_accounts = find_all_account_last4(doc_text) + find_all_account_last4(message.body_text)
+    other_accounts = [a for a in dict.fromkeys(all_accounts) if a != primary_account]
     return ExtractedInvoice(
         vendor_claimed=vendor,
         payee_name=payee,
         amount=amount,
         currency=detect_currency(combined),
         invoice_number=find_invoice_number(doc_text) or find_invoice_number(combined),
-        bank_account_last4=find_account_last4(doc_text) or find_account_last4(message.body_text),
+        bank_account_last4=primary_account,
+        other_account_last4=other_accounts,
         routing_number_last4=find_routing_last4(doc_text) or find_routing_last4(message.body_text),
         bank_change_requested=bank_change,
         bank_change_justification=bank_change_sentence(combined) if bank_change else None,
@@ -222,11 +288,11 @@ def extract(message: InboundMessage, docs: list[DocumentText], llm: Optional[Cla
     """Returns (invoice, method) where method is 'claude' or 'offline'."""
     offline = extract_offline(message, docs)
     if llm is None or not llm.available:
-        return offline, "offline"
+        return normalise_extraction(offline), "offline"
     parsed = llm.parse(system=EXTRACTION_SYSTEM, user=_extraction_prompt(message, docs),
                        output_model=ExtractedInvoice, effort=llm.settings.extract_effort)
     if parsed is None:
-        return offline, "offline"
+        return normalise_extraction(offline), "offline"
     # Claude is better at names and narrative; the regexes are exact on numbers. Merge: keep
     # Claude's fields, but never let it widen a number the deterministic path pinned down.
     merged = parsed.model_copy(update={
@@ -237,4 +303,6 @@ def extract(message: InboundMessage, docs: list[DocumentText], llm: Optional[Cla
         "contact_change_requested": parsed.contact_change_requested or offline.contact_change_requested,
         "urgency_phrases": list(dict.fromkeys([*parsed.urgency_phrases, *offline.urgency_phrases])),
     })
-    return merged, "claude"
+    # Validate/normalise whatever is left: a full account number, a "$" currency or a
+    # negative amount from the model would otherwise break the frozen Decision schema.
+    return normalise_extraction(merged), "claude"

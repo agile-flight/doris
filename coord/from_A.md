@@ -21,3 +21,28 @@ Append dated notes here when anything B reads changes: schema, samples, API, out
 ## 2026-10-23 — handoff verification
 - Added COLLABORATION.md (private repo access, offline setup, commit/push/pull workflow) and BUILD_PLAN.md (repository summary plus original document link).
 - Reverified 162 tests, contract check, and offline evaluation. No API calls or contract changes. Original Claude doc requires sign-in; its Handoff tab was not modified.
+
+## 2026-10-23 — adversarial-review findings fixed (Agent A half)
+
+All open findings from the fresh-context review are closed. 208 tests (was 162) + contract pass; the confusion
+matrix is unchanged (14/15 fraud stopped, 0/12 legitimate blocked). **The Decision shape is unchanged**, but two
+field *values* moved, so re-pull before building the surfaces:
+
+1. **`signals[]` for `bank_account_changed` gained `new_routing` / `on_file_routing` in `evidence`,** and its
+   `detail` now also reports a routing change when the routing differs (routing is compared, not just last-4).
+2. **`prompt_injection` no longer quotes the hidden text** in `detail` or in `reasons[]` — it reports kind and
+   location only (`"white text, line 14"`, `"Hidden white text on line 14 (2 spans)"`). The hidden text stays in
+   `signals[].evidence.findings[].text` if a surface wants to show it.
+
+API behaviour changes B should know about (all 400, never 500):
+- `POST .../callback_result` requires a real JSON boolean for `vendor_confirmed`; the string `"false"` is rejected.
+  `called`, if sent, must equal the `callback_number` in the Decision, or the request is refused.
+- `POST .../review` requires a real boolean `approve`; a prompt-injection `BLOCKED` cannot be approved into `PAY`.
+- A Decision can be resolved **once**: a second callback/review on the same `decision_id` is refused (400).
+- `GET /decisions?limit=abc` and a bad body type (`{"text": 123}`) return 400 instead of 500.
+- `POST /check` with `{"invoice_id": 42}` is accepted and coerced to `"42"` (never stored as an int).
+- A PDF attachment the detector cannot read forces `HOLD` (a reason line names it) instead of being dropped.
+
+`contract/samples/*.json` were regenerated from the pipeline, so their hashes and the two field values above
+differ from before. Re-pull `contract/` before building against it.
+

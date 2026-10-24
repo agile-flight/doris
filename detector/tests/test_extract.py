@@ -5,10 +5,12 @@ import pytest
 
 from detector.extract import (
     detect_bank_change, detect_contact_change, detect_currency, extract, extract_offline,
-    find_account_last4, find_amount, find_invoice_number, find_payee, find_routing_last4,
-    find_urgency, mask_last4, parse_amount,
+    find_account_last4, find_all_account_last4, find_amount, find_invoice_number, find_payee,
+    find_routing_last4, find_urgency, mask_last4, normalise_currency, normalise_extraction,
+    normalise_last4, parse_amount,
 )
 from detector.ingest import extract_documents, ingest
+from detector.models import DocumentText, ExtractedInvoice
 from detector.tests.conftest import FIXTURES
 
 FIXTURE_DIFF_FIELDS = [
@@ -59,6 +61,28 @@ def test_find_account_and_routing_last4():
     assert find_account_last4(text) == "8841"
     assert find_routing_last4(text) == "9593"
     assert find_account_last4("Account: none") is None
+
+
+def test_find_all_account_last4_keeps_every_distinct_account():
+    text = ("Account Number: 7002 3311 8841\n"
+            "Backup Account Number: 400081235577\n"
+            "Duplicate Account Number: 700233118841")
+    assert find_all_account_last4(text) == ["8841", "5577"]
+    assert find_all_account_last4("no accounts here") == []
+
+
+def test_second_account_lands_in_other_account_last4():
+    from detector.models import InboundMessage
+    from datetime import datetime, timezone
+    msg = InboundMessage(
+        sender_email="billing@acmesupply.com", sender_name="Acme Supply", reply_to=None,
+        subject="INV-1", body_text="Account Number: 700233119999", body_hidden=[], attachments=[],
+        received_at=datetime(2026, 10, 23, tzinfo=timezone.utc), raw_sha256="0" * 64,
+    )
+    doc = DocumentText(visible="Remit to: Acme Supply Co.\nRouting Number: 026009593\nAccount Number: 7002 3311 8841\nTotal Due: $10.00")
+    inv = extract_offline(msg, [doc])
+    assert inv.bank_account_last4 == "8841"
+    assert inv.other_account_last4 == ["9999"]
 
 
 def test_mask_last4():
@@ -113,3 +137,57 @@ def test_detect_currency():
     assert detect_currency("Total €1.200,00") == "EUR"
     assert detect_currency("Total £900.00") == "GBP"
     assert detect_currency("Total 900.00") == "USD"
+
+
+# --- normalisation of model output (Finding 15) -------------------------------------
+
+def test_normalise_last4_from_any_shape():
+    assert normalise_last4("8841") == "8841"
+    assert normalise_last4("****8841") == "8841"
+    assert normalise_last4("7002 3311 8841") == "8841"
+    assert normalise_last4("1234567890123456") == "3456"
+    assert normalise_last4(None) is None
+    assert normalise_last4("--") is None
+    assert len(normalise_last4("99999")) == 4
+
+
+def test_normalise_currency_to_iso():
+    assert normalise_currency("$") == "USD"
+    assert normalise_currency("USD") == "USD"
+    assert normalise_currency("usd") == "USD"
+    assert normalise_currency("€") == "EUR"
+    assert normalise_currency("£") == "GBP"
+    assert normalise_currency("JPY") == "JPY"
+    assert normalise_currency("") == "USD"
+    assert normalise_currency(None) == "USD"
+    assert normalise_currency("dollars") == "USD"
+
+
+def test_normalise_extraction_clamps_model_breakage():
+    raw = ExtractedInvoice(
+        bank_account_last4="1234567890123456", routing_number_last4="****9593",
+        amount=-4820.0, currency="$", other_account_last4=["7002 3311 8841", ""],
+    )
+    fixed = normalise_extraction(raw)
+    assert fixed.bank_account_last4 == "3456"
+    assert fixed.routing_number_last4 == "9593"
+    assert fixed.amount is None            # negative amounts are dropped
+    assert fixed.currency == "USD"
+    assert fixed.other_account_last4 == ["8841"]
+    # the masked value the pipeline would emit is schema-valid
+    assert mask_last4(fixed.bank_account_last4) == "****3456"
+
+
+def test_normalise_extraction_keeps_good_values():
+    raw = ExtractedInvoice(bank_account_last4="8841", amount=4820.0, currency="EUR",
+                           routing_number_last4="9593", other_account_last4=[])
+    fixed = normalise_extraction(raw)
+    assert (fixed.bank_account_last4, fixed.routing_number_last4) == ("8841", "9593")
+    assert fixed.amount == 4820.0 and fixed.currency == "EUR"
+
+
+def test_offline_extraction_is_always_normalised(fixtures):
+    msg = ingest((fixtures / "emails" / "bank_change_lookalike.eml").read_bytes())
+    invoice, method = extract(msg, extract_documents(msg), llm=None)
+    assert method == "offline"
+    assert len(invoice.bank_account_last4) <= 4 and invoice.currency == "USD"

@@ -116,10 +116,18 @@ class VendorOnFile:
     created_at: datetime
     last_contact_change_field: Optional[str] = None
     routing_last4: Optional[str] = None
+    routing_since: Optional[datetime] = None
+    phone_recorded_at: Optional[datetime] = None            # when we actually recorded the phone
+    last_contact_change_recorded_at: Optional[datetime] = None  # when the change was actually recorded
 
     def trusted_phone(self, now: datetime, on_file_days: int) -> tuple[Optional[str], Optional[datetime]]:
-        """The callback number, only if it is E.164 and has been on file unchanged for on_file_days."""
-        if (self.phone and E164.fullmatch(self.phone) and self.phone_since
-                and (now - self.phone_since).days >= on_file_days):
-            return self.phone, self.phone_since
+        """The callback number, only if it is E.164 and has been on file unchanged for on_file_days.
+
+        Trust is based on phone_recorded_at (when we actually recorded it), not phone_since
+        (when the vendor claims it became effective).
+        """
+        recorded = self.phone_recorded_at or self.phone_since
+        if (self.phone and E164.fullmatch(self.phone) and recorded
+                and (now - recorded).days >= on_file_days):
+            return self.phone, recorded
         return None, None
