@@ -13,7 +13,7 @@ dependencies = [
 dev = ["pytest>=8", "jsonschema>=4", "reportlab>=4"]
 
 [tool.pytest.ini_options]
-testpaths = ["contract", "detector/tests"]
+testpaths = ["contract", "detector/tests", "surfaces/tests"]
 pythonpath = ["."]
 addopts = "-q"
 
@@ -22,7 +22,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["detector*"]
+include = ["detector*", "surfaces*"]
 
 [tool.setuptools.package-data]
 detector = ["fixtures/**/*", "testset/*.json"]
