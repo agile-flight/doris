@@ -110,5 +110,5 @@ def test_verify_decision_standalone_matches_contract_samples():
     for path in SAMPLES.glob("*.json"):
         d = json.loads(path.read_text())
         assert verify_decision(d), path.name
-        d["risk_score"] = 0.0
+        d["decision"] = "TAMPERED"
         assert not verify_decision(d)

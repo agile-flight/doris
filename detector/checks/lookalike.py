@@ -78,7 +78,7 @@ def is_lookalike(candidate: str, target: str) -> Optional[str]:
     distance = levenshtein(cl, tl)
     if 0 < distance <= threshold:
         return "edit-distance"
-    if len(tl) >= 4 and tl in cl:
+    if len(tl) >= 4 and (tl in cl or tl.replace("-", "") in cl.replace("-", "")):
         return "label-append"
     return None
 

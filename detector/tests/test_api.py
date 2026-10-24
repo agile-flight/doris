@@ -90,3 +90,12 @@ def test_health_and_cors_preflight(base):
     req = urllib.request.Request(base + "/check", method="OPTIONS")
     with urllib.request.urlopen(req, timeout=10) as resp:
         assert resp.status == 204 and "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
+
+
+def test_evaluation_route(base, tmp_path, monkeypatch):
+    import detector.evaluate as evaluate
+    monkeypatch.setattr(evaluate, "DEFAULT_OUT", tmp_path / "cm.json")
+    assert call(base, "GET", "/evaluation")[0] == 404
+    (tmp_path / "cm.json").write_text(json.dumps({"metrics": {"catch_rate": 0.93}, "rows": []}))
+    status, body, _ = call(base, "GET", "/evaluation")
+    assert status == 200 and body["metrics"]["catch_rate"] == 0.93

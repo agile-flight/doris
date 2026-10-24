@@ -170,6 +170,8 @@ def test_payee_mismatch_quiet_cases():
     ("acmesupp1y.com", "acmesupply.com", "homoglyph"),
     ("acmesupply.net", "acmesupply.com", "tld-swap"),
     ("acmesupply-billing.com", "acmesupply.com", "label-append"),
+    ("acme-supply-group.com", "acmesupply.com", "label-append"),
+    ("secure-acmesupply.net", "acmesupply.com", "label-append"),
     ("acmesupply.com.secure-portal.net", "acmesupply.com", "subdomain"),
     ("аcmesupply.com".encode("idna").decode("ascii"), "acmesupply.com", "punycode"),
     ("acne.com", "acme.com", "edit-distance"),

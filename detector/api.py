@@ -82,6 +82,11 @@ def make_handler(doris: Doris):
                 return self._send(200, decision) if decision else self._send(404, {"error": f"no decision {m.group(1)}"})
             if path == "/audit/verify":
                 return self._send(200, asdict(doris.verify()))
+            if path == "/evaluation":
+                from . import evaluate
+                if not evaluate.DEFAULT_OUT.exists():
+                    return self._send(404, {"error": "no evaluation yet; run: python -m detector evaluate"})
+                return self._send(200, json.loads(evaluate.DEFAULT_OUT.read_text()))
             if path == "/vendors":
                 return self._send(200, [asdict(v) for v in doris.vendors.list()])
             self._send(404, {"error": f"no route {path}"})

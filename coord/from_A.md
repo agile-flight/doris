@@ -14,3 +14,6 @@ Append dated notes here when anything B reads changes: schema, samples, API, out
   shape unchanged. `llm_judgment` shows `skipped` in samples because they are generated offline.
 - Detector API is up: `python -m detector serve` on :8787. Routes in `contract/README.md` (`/check`, `/decisions`,
   `/decisions/{id}/callback_result`, `/decisions/{id}/review`, `/audit/verify`, `/vendors`, `/health`). CORS is open.
+- Confusion matrix: `python -m detector evaluate` writes `data/evidence/confusion_matrix.json`; the API serves it at
+  `GET /evaluation` (`metrics.catch_rate`, `metrics.false_positive_rate`, `metrics.legit_blocked`, `rows[]`). Offline:
+  14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design (first-time vendor, genuine bank change).

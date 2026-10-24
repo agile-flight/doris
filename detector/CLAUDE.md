@@ -10,3 +10,7 @@ audit log and written to `data/outbox/<decision_id>.json`.
 - Hidden PDF text goes to the prompt-injection check only. The extractor and the judge see visible text.
 - Signal weights and thresholds live in `detector/config.py`; the mapping to PAY/HOLD/CALLBACK/BLOCKED in `detector/scoring.py`.
 - Public surface for Agent B: `from detector import Doris` and `python -m detector serve` (see `contract/README.md`).
+- Evidence: `.venv/bin/python -m detector evaluate` prints the confusion matrix on `detector/testset/cases.json`
+  and writes `data/evidence/confusion_matrix.json` (served at `GET /evaluation`). Report catch rate AND false-positive rate.
+- Slices and their checks: ingest/extract (fixture diff), signals (one test each; white-text invoice = max risk),
+  risk score (confusion matrix), audit chain (tamper test), vendor versioning (89-day number never used).
