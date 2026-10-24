@@ -71,15 +71,21 @@ class Store:
         with self._lock:
             return self._con.execute(sql, args).fetchone()[0]
 
+    def set_verdict(self, token: str, verdict: str, decision_id: Optional[str]) -> None:
+        with self._lock:
+            self._con.execute("UPDATE door_checks SET verdict = ?, decision_id = ? WHERE token = ?", (verdict, decision_id, token))
+            self._con.commit()
+
     def set_feedback(self, token: str, value: str) -> bool:
         with self._lock:
-            cur = self._con.execute("UPDATE door_checks SET feedback = ? WHERE token = ?", (value, token))
+            cur = self._con.execute("UPDATE door_checks SET feedback = ? WHERE token = ? AND verdict IN ('safe','suspicious','scam')", (value, token))
             self._con.commit()
         return cur.rowcount == 1
 
     def stats(self) -> dict:
         with self._lock:
-            rows = self._con.execute("SELECT verdict, feedback, COUNT(*) n FROM door_checks GROUP BY verdict, feedback").fetchall()
+            rows = self._con.execute("SELECT verdict, feedback, COUNT(*) n FROM door_checks WHERE verdict IN ('safe','suspicious','scam')"
+                                     " GROUP BY verdict, feedback").fetchall()
         out = {"checks": 0, "safe": 0, "suspicious": 0, "scam": 0, "up": 0, "down": 0}
         for r in rows:
             out["checks"] += r["n"]

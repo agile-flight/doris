@@ -119,7 +119,13 @@ class DashboardHandler(_Base):
                 decisions, ok = self.app.client.list(limit=50), True
             except DetectorError:
                 decisions, ok = [], False
-            return self.send(200, render.queue_screen(decisions, detector_ok=ok, stats=self.app.store.stats(), flash=flash))
+            newest = decisions[0]["decision_id"] if decisions else ""
+            live = (parse_qs(url.query).get("live") or [""])[0] == "1"
+            return self.send(200, render.queue_screen(decisions, detector_ok=ok, stats=self.app.store.stats(), flash=flash,
+                                                      live_from=newest if live else None))
+        if path == "/latest/state":
+            decisions = self.app.client.list(limit=1)
+            return self.json(200, {"latest_id": decisions[0]["decision_id"] if decisions else ""})
         if path == "/samples":
             return self.send(200, render.samples_screen([p.stem for p in sorted(SAMPLES_DIR.glob("*.json"))]))
         m = re.fullmatch(r"/samples/([\w\-]+)", path)

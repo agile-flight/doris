@@ -351,7 +351,8 @@ def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opt
     return page(f"BLOCKED: {d.get('invoice_id')}", body, body_class="blocked-screen", poll=url, decision_id=d.get("decision_id"))
 
 
-def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = True, flash: str = "") -> str:
+def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = True, flash: str = "",
+                 live_from: Optional[str] = None) -> str:
     rows = []
     for d in decisions:
         rows.append(f'<tr><td>{esc(when(d.get("created_at"), "short"))}</td><td><a href="/d/{esc(d.get("decision_id"))}">{esc(d.get("invoice_id"))}</a></td>'
@@ -359,7 +360,8 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
                     f'<td>{pill(d.get("decision", ""))}</td><td>{float(d.get("risk_score") or 0):.2f}</td></tr>')
     status = '<span class="ok">Detector connected</span>' if detector_ok else '<span class="bad">Detector not reachable</span>'
     demo_form = ('<form class="inline" method="post" action="/demo/send"><button class="primary">Send the demo bank-change email</button>'
-                 '<span class="quiet">Runs the live demo email through Doris and opens its screen.</span></form>') if demo else ""
+                 '<span class="quiet">Runs the live demo email through Doris and opens its screen.</span></form>'
+                 '<p class="quiet" style="margin:8px 0 0"><a href="/?live=1">Live mode</a>: this page opens each new decision the moment it arrives.</p>') if demo else ""
     door = ""
     if stats:
         door = (f'<section class="panel"><h2>Forward-to-check door</h2><p style="margin:0">{esc(stats.get("checks", 0))} emails checked, '
@@ -369,6 +371,8 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
            f'<section class="panel"><p style="margin-top:0">{status}.</p>{demo_form}</section>{door}' + \
            ('<section class="panel"><h2>Decisions, newest first</h2><div class="scroll"><table><tr><th>When</th><th>Invoice</th><th>Claims to be</th>'
             f'<th>Amount</th><th>Decision</th><th>Risk</th></tr>{"".join(rows) or "<tr><td colspan=6>No decisions yet</td></tr>"}</table></div></section>')
+    if live_from is not None:
+        return page("Doris queue (live)", body, poll="/latest/state", decision_id=live_from)
     return page("Doris queue", body)
 
 
