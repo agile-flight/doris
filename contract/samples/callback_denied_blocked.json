@@ -148,6 +148,6 @@
   ],
   "llm_rationale": "The message follows the bank-change script: a new 'treasury provider', a deadline tied to the next payment run, and a request to confirm by replying to this email.",
   "supersedes": "dec_8f2c1a9b0002",
-  "audit_hash": "sha256:7dfff264252e26f39866f26119ba0ba3f323e6dd6a52671a1bdb9728f3e1d177",
-  "prev_hash": "sha256:5255bd0ac9d46ae59302a3b608028fb3c30fd87de7de70ba694980ca211a2f6f"
+  "audit_hash": "sha256:80e25f6cc34914d0d2fb4ab608d3543eb44008096aa981550fed0cd88560b10d",
+  "prev_hash": "sha256:4dd10937cf60dc1b8a14da2381cbea83d572904b51ac7e5a0d970171c2b2a137"
 }

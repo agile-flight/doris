@@ -65,14 +65,18 @@ def test_sample_decision_rules(path: Path):
     """The rules in contract/README.md hold on every sample."""
     d = json.loads(path.read_text())
     fired = {s["name"] for s in d["signals"] if s["fired"]}
-    if "prompt_injection" in fired or d["risk_score"] >= 0.85:
+    if "callback_result" in fired or "human_review" in fired:
+        assert d["decision"] in ("PAY", "BLOCKED") and d["supersedes"]
+    elif "prompt_injection" in fired:
+        assert d["decision"] == "BLOCKED" and d["risk_score"] >= 0.95
+    elif "bank_account_changed" in fired and d["callback_number"]:
+        assert d["decision"] == "CALLBACK"
+    elif d["risk_score"] >= 0.85:
         assert d["decision"] == "BLOCKED"
-    elif "callback_result" in fired or "human_review" in fired:
-        assert d["decision"] in ("PAY", "BLOCKED")
     elif "new_vendor" in fired:
         assert d["decision"] == "HOLD"
     elif "bank_account_changed" in fired:
-        assert d["decision"] == ("CALLBACK" if d["callback_number"] else "HOLD")
+        assert d["decision"] == "HOLD"
     else:
         assert d["decision"] == ("PAY" if d["risk_score"] < 0.30 else "HOLD")
     if d["callback_number"] is not None:

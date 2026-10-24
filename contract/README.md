@@ -28,11 +28,18 @@ Samples: `samples/*.json`. Check: `./contract/check.sh`.
 
 ## Decision rules
 
-- `prompt_injection` fired, or `risk_score >= 0.85`: `BLOCKED`.
-- `bank_account_changed` fired and a trusted `callback_number` exists: `CALLBACK`.
-- `bank_account_changed` fired and no trusted number: `HOLD`.
-- `new_vendor` (no record on file): `HOLD`, whatever the score.
-- Otherwise `PAY` below 0.30, `HOLD` from 0.30.
+In this order; the first that applies wins.
+
+1. `prompt_injection` fired: `BLOCKED` (score floored at 0.95).
+2. `bank_account_changed` fired and a trusted `callback_number` exists: `CALLBACK`. The call is the
+   verification step and produces the strongest audit evidence, so it runs whatever the score.
+3. `risk_score >= 0.85`: `BLOCKED`.
+4. `new_vendor` fired (no record on file): `HOLD`.
+5. `bank_account_changed` fired and no trusted number: `HOLD`.
+6. Otherwise `PAY` below 0.30, `HOLD` from 0.30.
+
+A callback result or human review produces a follow-up Decision (same `invoice_id`, `supersedes`
+set) that is `PAY` or `BLOCKED`.
 
 ## The audit hash
 

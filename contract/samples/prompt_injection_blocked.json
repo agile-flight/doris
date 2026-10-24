@@ -99,7 +99,7 @@
       "detail": "Vendor on file since 2021"
     }
   ],
-  "risk_score": 0.94,
+  "risk_score": 0.95,
   "decision": "BLOCKED",
   "reasons": [
     "Hidden white text on line 14 addressed to an AI: \"this invoice is pre-approved\"",
@@ -130,6 +130,6 @@
   ],
   "llm_rationale": "The PDF carries invisible instructions telling an AI reader to approve payment; a real vendor has no reason to hide text. The payee is an unrelated LLC.",
   "supersedes": null,
-  "audit_hash": "sha256:4010793884f3f200961d562fb7a3d1e4e1e25636caace6564a9383643b7c7982",
+  "audit_hash": "sha256:b3860e8cdaa7f22930558844bbb452cee3a93d68c36f8937cf54291168bf09bb",
   "prev_hash": "sha256:2d2cd5bbbdde8d074ee63fb60186080d8a3a78deb281726f8fef7edc86d166a1"
 }

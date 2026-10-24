@@ -102,6 +102,6 @@
   ],
   "llm_rationale": "An ordinary first invoice with no pressure language; nothing on file yet to verify it against.",
   "supersedes": null,
-  "audit_hash": "sha256:5255bd0ac9d46ae59302a3b608028fb3c30fd87de7de70ba694980ca211a2f6f",
-  "prev_hash": "sha256:4010793884f3f200961d562fb7a3d1e4e1e25636caace6564a9383643b7c7982"
+  "audit_hash": "sha256:4dd10937cf60dc1b8a14da2381cbea83d572904b51ac7e5a0d970171c2b2a137",
+  "prev_hash": "sha256:b3860e8cdaa7f22930558844bbb452cee3a93d68c36f8937cf54291168bf09bb"
 }
