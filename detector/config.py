@@ -30,7 +30,7 @@ class Settings:
     outbox_dir: Path = PROJECT_ROOT / "data" / "outbox"
     on_file_days: int = 90          # "on file" means unchanged for this long
     new_cert_days: int = 30         # a domain whose first certificate is younger than this is suspicious
-    crtsh_timeout: float = 6.0
+    crtsh_timeout: float = 4.0
     block_threshold: float = 0.85
     hold_threshold: float = 0.30
     amount_anomaly_ratio: float = 2.5   # > this x median flags amount_anomaly

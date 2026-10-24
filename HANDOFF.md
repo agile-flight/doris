@@ -6,8 +6,8 @@ Repo: https://github.com/agile-flight/doris · Submission deadline: Sun 2026-10-
 ## Where it stands (2026-10-24)
 Agent A's detector is complete end to end and offline-testable: 215 tests pass, the contract check passes,
 the confusion matrix runs (14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design), and the
-DOJ-derived set runs clean (12/12 fraud stopped, 0 blocked outright). The live Claude path has never run
-(no API key on either machine yet). All 20 adversarial-review findings are closed; an independent replay of
+DOJ-derived set runs clean (12/12 fraud stopped, 0 blocked outright). The live Claude path is verified (2026-10-24): all
+5 fixture emails decide correctly with Claude extracting and judging, about 8 seconds per check. All 20 adversarial-review findings are closed; an independent replay of
 every attack (2026-10-24) found 6 more gaps, now closed too and pinned by `tests/test_review_attacks.py`.
 Agent B's `surfaces/` folder is empty apart from its CLAUDE.md.
 
@@ -93,7 +93,10 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 
 ## Still to do
 - [ ] Agent B: review screen + CT strip, callback (Cartesia + Twilio), forward-to-check door, BLOCKED screen (`surfaces/` is empty).
-- [ ] Run once with `ANTHROPIC_API_KEY` set; check `GET /health` shows `llm_available: true`, then rerun `evaluate` without `--offline`.
+- [x] Live Claude run: 5/5 fixtures correct. It found two bugs, now fixed: the extraction schema was rejected
+  ("Schema is too complex", so Claude was silently skipped) and crt.sh retries made each check take 80-95 s.
+- [ ] Twilio needs the Account SID (starts `AC`) beside the API key and secret before it can place the callback.
+- [ ] Keys stay out of git: keep them in a file outside the repo (or `.env`, which is ignored) and share them with your teammate directly, not through GitHub.
 - [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
 
 ## Calls made that interpret the build doc

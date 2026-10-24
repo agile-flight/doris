@@ -66,6 +66,11 @@ class Doris:
         """Score one incoming message (RFC 822 bytes or forwarded text) and seal the Decision."""
         now = self.now()
         message = ingest(raw, now=now)
+        # Warm the Certificate Transparency cache in the background while Claude extracts.
+        ct_domains = {d for d in (message.sender_domain, message.outer_sender_domain) if d} | set(self.vendors.known_domains())
+        prefetch = [threading.Thread(target=self.ct.certificates, args=(d,), daemon=True) for d in sorted(ct_domains)]
+        for t in prefetch:
+            t.start()
         message.attachments.extend(extra_attachments)
         docs = extract_documents(message)
         invoice, method = extract(message, docs, self.llm)

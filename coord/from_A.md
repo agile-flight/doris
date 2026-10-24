@@ -58,3 +58,7 @@ What B reads that changed (shape unchanged, samples regenerated):
 - A confirmed `callback_result` with no `bank_account_new` returns a `HOLD` follow-up (contract README updated).
 - `bank_account_changed.evidence` gained `other_accounts`; a claimed change with the same last 4 now fires (`CALLBACK`).
 - Hidden HTML preheaders and white button text on coloured backgrounds no longer block.
+
+## 2026-10-24 — live Claude path verified (Agent A)
+5/5 fixtures decide correctly live, ~8 s per check (Claude extraction ~4 s + judgment ~3.5 s; crt.sh prefetched in parallel).
+Decision shape unchanged. Twilio still needs its Account SID (AC...) for the callback.

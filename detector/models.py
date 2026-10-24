@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 E164 = re.compile(r"\+[1-9][0-9]{6,14}")
 
@@ -70,6 +70,33 @@ class InboundMessage:
         if self.reply_to and "@" in self.reply_to:
             return self.reply_to.rsplit("@", 1)[1].lower()
         return None
+
+
+def _all_required(schema: dict, cls=None) -> None:
+    props = schema.get("properties", {})
+    schema["required"] = list(props)
+    for prop in props.values():
+        prop.pop("default", None)
+
+
+class ClaudeExtraction(BaseModel):
+    """What Claude fills in for extraction. Flat and fully required, with "" or [] meaning absent:
+    the API rejects schemas with many optional or nullable fields ("Schema is too complex")."""
+    model_config = ConfigDict(json_schema_extra=_all_required)
+    vendor_claimed: str = Field("", description="Company the message claims to be from; empty if unknown.")
+    payee_name: str = Field("", description="Name payment should be made out to (remit-to, beneficiary, pay-to); empty if none.")
+    amount: str = Field("", description="Total amount due exactly as printed, e.g. '$4,820.00'; empty if none.")
+    currency: str = Field("USD", description="ISO 4217 code, e.g. USD.")
+    invoice_number: str = Field("", description="Invoice identifier as printed; empty if none.")
+    bank_account_last4: str = Field("", description="Last four digits of the bank account it asks to pay to; empty if none.")
+    routing_number_last4: str = Field("", description="Last four digits of the routing/ABA number; empty if none.")
+    other_account_last4: list[str] = Field(default_factory=list, description="Last four digits of any other payment account numbers given.")
+    bank_change_requested: bool = Field(False, description="True if it asks to pay to new or changed bank details, or says they changed.")
+    bank_change_justification: str = Field("", description="The reason given for the change; empty if none.")
+    contact_change_requested: bool = Field(False, description="True if it asks to update a phone number, email or contact person on file.")
+    contact_change_detail: str = Field("", description="What contact detail it asks to change; empty if none.")
+    urgency_phrases: list[str] = Field(default_factory=list, description="Short quoted phrases that create time pressure.")
+    summary: str = Field("", description="One neutral sentence describing the message.")
 
 
 class ExtractedInvoice(BaseModel):

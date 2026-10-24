@@ -9,7 +9,7 @@ import re
 from typing import Optional
 
 from .llm import Claude
-from .models import DocumentText, ExtractedInvoice, InboundMessage
+from .models import ClaudeExtraction, DocumentText, ExtractedInvoice, InboundMessage
 
 EXTRACTION_SYSTEM = """You are Doris, an accounts-payable fraud control. Extract fields from an incoming vendor email and the visible text of its attached invoice.
 
@@ -284,15 +284,29 @@ def _extraction_prompt(message: InboundMessage, docs: list[DocumentText]) -> str
     return "\n".join(parts)
 
 
+def _from_claude(c: ClaudeExtraction) -> ExtractedInvoice:
+    blank = lambda v: (v or "").strip() or None
+    return ExtractedInvoice(
+        vendor_claimed=blank(c.vendor_claimed), payee_name=blank(c.payee_name),
+        amount=parse_amount(c.amount) if blank(c.amount) else None, currency=blank(c.currency) or "USD",
+        invoice_number=blank(c.invoice_number), bank_account_last4=blank(c.bank_account_last4),
+        routing_number_last4=blank(c.routing_number_last4), other_account_last4=[a for a in c.other_account_last4 if blank(a)],
+        bank_change_requested=c.bank_change_requested, bank_change_justification=blank(c.bank_change_justification),
+        contact_change_requested=c.contact_change_requested, contact_change_detail=blank(c.contact_change_detail),
+        urgency_phrases=[p for p in c.urgency_phrases if blank(p)], summary=c.summary or "",
+    )
+
+
 def extract(message: InboundMessage, docs: list[DocumentText], llm: Optional[Claude]) -> tuple[ExtractedInvoice, str]:
     """Returns (invoice, method) where method is 'claude' or 'offline'."""
     offline = extract_offline(message, docs)
     if llm is None or not llm.available:
         return normalise_extraction(offline), "offline"
-    parsed = llm.parse(system=EXTRACTION_SYSTEM, user=_extraction_prompt(message, docs),
-                       output_model=ExtractedInvoice, effort=llm.settings.extract_effort)
-    if parsed is None:
+    raw = llm.parse(system=EXTRACTION_SYSTEM, user=_extraction_prompt(message, docs),
+                    output_model=ClaudeExtraction, effort=llm.settings.extract_effort)
+    if raw is None:
         return normalise_extraction(offline), "offline"
+    parsed = _from_claude(raw)
     # Claude is better at names and narrative; the regexes are exact on numbers. Merge: keep
     # Claude's fields, but never let it widen a number the deterministic path pinned down.
     merged = parsed.model_copy(update={

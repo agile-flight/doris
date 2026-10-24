@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -41,14 +43,22 @@ class FixtureCTProvider:
     def certificates(self, domain: str) -> Optional[list[datetime]]:
         return list(self._data.get(domain.lower(), []))
 
+    def knows(self, domain: str) -> bool:
+        return domain.lower() in self._data
+
 
 class CrtShProvider:
     """Live lookups against crt.sh, cached per process. Any failure returns None (unavailable)."""
+
+    FAILURE_TTL = 300.0  # seconds: retry crt.sh after a failure, but not on every request
 
     def __init__(self, timeout: float = 6.0, fallback: Optional[CTProvider] = None):
         self.timeout = timeout
         self.fallback = fallback
         self._cache: dict[str, Optional[list[datetime]]] = {}
+        self._failed_at: dict[str, float] = {}
+        self._inflight: dict[str, threading.Event] = {}
+        self._lock = threading.Lock()
 
     def _query(self, q: str) -> list[datetime]:
         url = "https://crt.sh/?" + urllib.parse.urlencode({"q": q, "output": "json"})
@@ -64,14 +74,31 @@ class CrtShProvider:
 
     def certificates(self, domain: str) -> Optional[list[datetime]]:
         domain = domain.lower()
-        if domain in self._cache:
-            return self._cache[domain]
+        with self._lock:
+            failed = self._failed_at.get(domain)
+            if domain in self._cache and (failed is None or time.monotonic() - failed < self.FAILURE_TTL):
+                return self._cache[domain]
+            event = self._inflight.get(domain)
+            owner = event is None
+            if owner:
+                event = self._inflight[domain] = threading.Event()
+        if not owner:  # another thread (the prefetch) is already asking crt.sh
+            event.wait(self.timeout + 2)
+            return self._cache.get(domain)
         try:
-            certs = sorted(set(self._query(domain) + self._query("%." + domain)))
+            certs = sorted(set(self._query(domain)))  # one query per domain: crt.sh is slow and often 502s
+            self._failed_at.pop(domain, None)
         except Exception as exc:  # network, timeout, bad JSON: the signal reports "unavailable"
             log.warning("crt.sh lookup failed for %s: %s", domain, exc)
-            certs = self.fallback.certificates(domain) if self.fallback else None
+            # The fixture answers only for domains it knows; for anything else the honest answer is "unavailable".
+            known = isinstance(self.fallback, FixtureCTProvider) and self.fallback.knows(domain)
+            certs = self.fallback.certificates(domain) if known else None
+            self._failed_at[domain] = time.monotonic()
+        finally:
+            with self._lock:
+                self._inflight.pop(domain, None)
         self._cache[domain] = certs
+        event.set()
         return certs
 
 

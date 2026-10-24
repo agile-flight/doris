@@ -126,8 +126,11 @@ class FakeLLM:
         self.prompts = []; self.extract_override = extract_override or {}
     def parse(self, *, system, user, output_model, effort, max_tokens=4096):
         self.prompts.append(user)
-        if output_model.__name__ == "ExtractedInvoice":
-            return output_model(**{"vendor_claimed": "Acme Supply", **self.extract_override})
+        if output_model.__name__ in ("ExtractedInvoice", "ClaudeExtraction"):
+            fields = {"vendor_claimed": "Acme Supply", **self.extract_override}
+            if output_model.__name__ == "ClaudeExtraction":
+                fields = {k: ("" if v is None else str(v) if k == "amount" else v) for k, v in fields.items()}
+            return output_model(**fields)
         return output_model(risk=0.5, tactics=["none"], rationale="r", confidence="low")
 f = FakeLLM()
 doris(llm=f).check((FIXTURES / "emails/prompt_injection.eml").read_bytes())
