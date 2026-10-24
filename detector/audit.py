@@ -90,6 +90,10 @@ class AuditLog:
             seq, prev = self.head()
             seq += 1
             payload = dict(fields)
+            if kind != "decision":
+                # A Decision's payload is fixed by the contract; every other record seals its kind,
+                # so relabelling a row (say, hiding a decision as "intake") breaks verification.
+                payload["record_kind"] = kind
             payload["seq"] = seq
             payload["prev_hash"] = prev
             payload.setdefault("created_at", now_iso())
@@ -133,6 +137,8 @@ class AuditLog:
                 return VerifyResult(False, count, rec.seq, f"record {rec.seq}: expected seq {expected_seq} (a record is missing)")
             if rec.prev_hash != expected_prev:
                 return VerifyResult(False, count, rec.seq, f"record {rec.seq}: prev_hash does not match the previous record's hash")
+            if rec.kind != rec.payload.get("record_kind", "decision"):
+                return VerifyResult(False, count, rec.seq, f"record {rec.seq}: kind column '{rec.kind}' does not match the sealed record")
             if rec.payload.get("seq") != rec.seq or rec.payload.get("prev_hash") != rec.prev_hash:
                 return VerifyResult(False, count, rec.seq, f"record {rec.seq}: payload seq/prev_hash disagree with the row")
             if compute_hash(rec.prev_hash, rec.payload) != rec.hash:

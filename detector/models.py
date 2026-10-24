@@ -1,11 +1,14 @@
 """Data shapes shared across the detector. The Decision itself is defined by the contract."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+E164 = re.compile(r"\+[1-9][0-9]{6,14}")
 
 
 @dataclass
@@ -31,7 +34,9 @@ class DocumentText:
     visible: str
     hidden: list[HiddenSpan] = field(default_factory=list)
     line_count: int = 0
-    error: Optional[str] = None
+    error: Optional[str] = None     # set when the attachment could not be read or inspected
+    name: str = ""
+    kind: str = "pdf"               # "pdf" | "html" | "text" | "other"
 
 
 @dataclass
@@ -46,6 +51,13 @@ class InboundMessage:
     received_at: datetime
     raw_sha256: str
     forwarded: bool = False
+    outer_sender_email: Optional[str] = None   # who actually sent us a forwarded message
+
+    @property
+    def outer_sender_domain(self) -> Optional[str]:
+        if self.outer_sender_email and "@" in self.outer_sender_email:
+            return self.outer_sender_email.rsplit("@", 1)[1].lower()
+        return None
 
     @property
     def sender_domain(self) -> Optional[str]:
@@ -73,6 +85,7 @@ class ExtractedInvoice(BaseModel):
     invoice_number: Optional[str] = Field(None, description="Invoice identifier as printed.")
     bank_account_last4: Optional[str] = Field(None, description="Last four digits of the bank account the message asks to pay to.")
     routing_number_last4: Optional[str] = Field(None, description="Last four digits of the routing/ABA number, if present.")
+    other_account_last4: list[str] = Field(default_factory=list, description="Last four digits of any other bank account numbers the message or invoices give for payment.")
     bank_change_requested: bool = Field(False, description="True if the message or invoice asks to pay to new or changed bank details, or says they changed.")
     bank_change_justification: Optional[str] = Field(None, description="The reason given for the change, quoted or paraphrased, if any.")
     contact_change_requested: bool = Field(False, description="True if it asks to update a phone number, email or contact person on file.")
@@ -102,9 +115,11 @@ class VendorOnFile:
     last_contact_change_at: Optional[datetime]
     created_at: datetime
     last_contact_change_field: Optional[str] = None
+    routing_last4: Optional[str] = None
 
     def trusted_phone(self, now: datetime, on_file_days: int) -> tuple[Optional[str], Optional[datetime]]:
-        """The callback number, only if it has been on file unchanged for on_file_days."""
-        if self.phone and self.phone_since and (now - self.phone_since).days >= on_file_days:
+        """The callback number, only if it is E.164 and has been on file unchanged for on_file_days."""
+        if (self.phone and E164.fullmatch(self.phone) and self.phone_since
+                and (now - self.phone_since).days >= on_file_days):
             return self.phone, self.phone_since
         return None, None
