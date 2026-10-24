@@ -65,11 +65,6 @@ def pretty_phone(number: Optional[str]) -> Optional[str]:
     return f"+1 {m.group(1)} {m.group(2)} {m.group(3)}" if m else number
 
 
-def _quote(text: Optional[str], n: int = 80) -> str:
-    text = (text or "").strip()
-    return text if len(text) <= n else text[: n - 1] + "…"
-
-
 def _reason_for(s: Signal, lookalike_fired: bool) -> Optional[str]:
     ev = s.evidence or {}
     if s.name == "bank_account_changed":
