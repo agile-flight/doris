@@ -1,0 +1,12 @@
+{
+  "vendor_claimed": "Acme Supply",
+  "payee_name": "Blue Horizon Automobile LLC",
+  "amount": 4820.0,
+  "currency": "USD",
+  "invoice_number": "INV-1043",
+  "bank_account_last4": "8841",
+  "routing_number_last4": "9593",
+  "bank_change_requested": true,
+  "contact_change_requested": false,
+  "urgency_phrases": []
+}

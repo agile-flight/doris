@@ -1,0 +1,20 @@
+---------- Forwarded message ---------
+From: Acme Supply Accounts <accounts@acme-supply.co>
+Date: Thu, Oct 22, 2026 at 3:12 PM
+Subject: URGENT: Updated remittance instructions - INV-1046
+To: ap@calhacksrobotics.com
+
+Hello,
+
+Effective today our remittance details have changed. Please send payment for invoice INV-1046 ($12,400.00) to:
+
+Bank: Pacific Crest Bank
+Routing Number: 322271627
+Account Number: 885500129930
+Beneficiary: Acme Supply Co
+
+This is urgent - payment must go out today to avoid service interruption. Please confirm by replying to this email.
+
+Regards,
+Dana Whitfield
+Accounts Receivable, Acme Supply

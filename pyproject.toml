@@ -14,6 +14,7 @@ dev = ["pytest>=8", "jsonschema>=4", "reportlab>=4"]
 
 [tool.pytest.ini_options]
 testpaths = ["contract", "detector/tests"]
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.setuptools]

@@ -1,0 +1,12 @@
+{
+  "vendor_claimed": "Acme Supply Accounts",
+  "payee_name": "Acme Supply Co",
+  "amount": 12400.0,
+  "currency": "USD",
+  "invoice_number": "INV-1046",
+  "bank_account_last4": "9930",
+  "routing_number_last4": "1627",
+  "bank_change_requested": true,
+  "contact_change_requested": false,
+  "urgency_phrases": ["urgent", "today", "avoid service interruption"]
+}

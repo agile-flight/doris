@@ -1,0 +1,12 @@
+{
+  "vendor_claimed": "Northwind Traders AR",
+  "payee_name": "Northwind Traders Inc.",
+  "amount": 1250.0,
+  "currency": "USD",
+  "invoice_number": "INV-1044",
+  "bank_account_last4": "5520",
+  "routing_number_last4": "0013",
+  "bank_change_requested": false,
+  "contact_change_requested": false,
+  "urgency_phrases": []
+}

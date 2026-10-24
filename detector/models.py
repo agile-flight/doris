@@ -1,0 +1,81 @@
+"""Data shapes shared across the detector. The Decision itself is defined by the contract."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+@dataclass
+class Attachment:
+    filename: str
+    content_type: str
+    data: bytes
+
+
+@dataclass
+class HiddenSpan:
+    """Text a human would not see: white-on-white, tiny, off the page, or CSS-hidden."""
+    source: str                 # "pdf" | "html"
+    reason: str                 # "white_text" | "tiny_text" | "off_page" | "css_hidden"
+    text: str
+    line: Optional[int] = None  # 1-based line in reading order (pdf only)
+    font_size: Optional[float] = None
+    color: Optional[list[float]] = None
+
+
+@dataclass
+class DocumentText:
+    visible: str
+    hidden: list[HiddenSpan] = field(default_factory=list)
+    line_count: int = 0
+    error: Optional[str] = None
+
+
+@dataclass
+class InboundMessage:
+    sender_email: Optional[str]
+    sender_name: Optional[str]
+    reply_to: Optional[str]
+    subject: Optional[str]
+    body_text: str
+    body_hidden: list[HiddenSpan]
+    attachments: list[Attachment]
+    received_at: datetime
+    raw_sha256: str
+    forwarded: bool = False
+
+    @property
+    def sender_domain(self) -> Optional[str]:
+        if self.sender_email and "@" in self.sender_email:
+            return self.sender_email.rsplit("@", 1)[1].lower()
+        return None
+
+    @property
+    def reply_to_domain(self) -> Optional[str]:
+        if self.reply_to and "@" in self.reply_to:
+            return self.reply_to.rsplit("@", 1)[1].lower()
+        return None
+
+
+class ExtractedInvoice(BaseModel):
+    """Fields pulled from the email and the visible invoice text.
+
+    Doubles as the structured-output schema for Claude, so keep it flat and simple.
+    Account numbers are last-4 only: the full number never leaves the ingest step.
+    """
+    vendor_claimed: Optional[str] = Field(None, description="Who the message claims to be from (company name).")
+    payee_name: Optional[str] = Field(None, description="Name the payment should be made out to (remit-to, beneficiary, pay-to).")
+    amount: Optional[float] = Field(None, description="Total amount due.")
+    currency: str = Field("USD", description="ISO 4217 code.")
+    invoice_number: Optional[str] = Field(None, description="Invoice identifier as printed.")
+    bank_account_last4: Optional[str] = Field(None, description="Last four digits of the bank account the message asks to pay to.")
+    routing_number_last4: Optional[str] = Field(None, description="Last four digits of the routing/ABA number, if present.")
+    bank_change_requested: bool = Field(False, description="True if the message or invoice asks to pay to new or changed bank details, or says they changed.")
+    bank_change_justification: Optional[str] = Field(None, description="The reason given for the change, quoted or paraphrased, if any.")
+    contact_change_requested: bool = Field(False, description="True if it asks to update a phone number, email or contact person on file.")
+    contact_change_detail: Optional[str] = Field(None, description="What contact detail it asks to change, if any.")
+    urgency_phrases: list[str] = Field(default_factory=list, description="Short quoted phrases that create time pressure.")
+    summary: str = Field("", description="One neutral sentence describing the message.")
