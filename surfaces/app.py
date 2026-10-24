@@ -33,8 +33,13 @@ class Surfaces:
         self.settings = settings
         self.client = client or DetectorClient(settings.detector_url)
         self.store = store or Store(settings.data_dir / "surfaces.db")
-        self.callbacks = None   # set by callback.CallManager when telephony is wired
-        self.door = None        # set by door.Door
+        self.callbacks = None   # set by callback.wire()
+        self.door = None        # set by door.wire()
+        self.hook_routes: list = []   # (method, path regex, fn(handler, *groups)) registered by callback.py and door.py
+
+    def route(self, method: str, pattern: str, fn) -> None:
+        if not any(r[0] == method and r[1] == pattern for r in self.hook_routes):
+            self.hook_routes.append((method, pattern, fn))
 
     def call_text(self, decision_id: str) -> str:
         call = self.store.latest_call(decision_id)
@@ -176,17 +181,20 @@ class DashboardHandler(_Base):
         if action == "call":
             if self.app.callbacks is None or not self.app.settings.twilio_ready:
                 return self.redirect(f"/d/{quote(decision_id)}?flash=" + quote("Telephony isn't configured yet; see surfaces/README.md."))
-            self.app.callbacks.start(self.app.client.get(decision_id))
+            from .callback import TelephonyError
+            try:
+                self.app.callbacks.start(self.app.client.get(decision_id))
+            except TelephonyError as exc:
+                return self.redirect(f"/d/{quote(decision_id)}?flash=" + quote(str(exc)[:180]))
             return self.redirect(f"/d/{quote(decision_id)}")
 
 
 class HooksHandler(_Base):
-    """Public webhooks. Routes are registered by callback.py and door.py."""
-    routes: list = []
+    """Public webhooks. Routes are registered per app by callback.wire() and door.wire()."""
 
     def _dispatch(self, method: str):
         path = urlparse(self.path).path
-        for verb, pattern, fn in self.routes:
+        for verb, pattern, fn in self.app.hook_routes:
             m = re.fullmatch(pattern, path)
             if m and verb == method:
                 return fn(self, *m.groups())
@@ -201,7 +209,7 @@ class HooksHandler(_Base):
 
 def make_servers(app: Surfaces) -> tuple[ThreadingHTTPServer, ThreadingHTTPServer]:
     dash = type("Dash", (DashboardHandler,), {"app": app})
-    hooks = type("Hooks", (HooksHandler,), {"app": app, "routes": list(HooksHandler.routes)})
+    hooks = type("Hooks", (HooksHandler,), {"app": app})
     a = ThreadingHTTPServer((app.settings.host, app.settings.port), dash)
     b = ThreadingHTTPServer((app.settings.host, app.settings.hooks_port), hooks)
     a.daemon_threads = b.daemon_threads = True

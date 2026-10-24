@@ -16,6 +16,9 @@ def main(argv=None) -> int:
     p = sub.add_parser("serve", help="the dashboard (localhost) and the public hooks server")
     p.add_argument("--port", type=int)
     p.add_argument("--hooks-port", type=int)
+    p = sub.add_parser("demo-seed", help="seed a demo detector database whose Acme record rings the judges' table")
+    p.add_argument("--phone", required=True, help="E.164 number of the phone on the judges' table, e.g. +14155550123")
+    p.add_argument("--db", default="data/demo.db", help="detector database to seed (use the same DORIS_DB for serve)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(name)s: %(message)s")
     settings = Settings.from_env()
@@ -23,14 +26,15 @@ def main(argv=None) -> int:
         settings.port = args.port
     if getattr(args, "hooks_port", None):
         settings.hooks_port = args.hooks_port
+    if args.cmd == "demo-seed":
+        from .demo import seed_demo
+        print(seed_demo(args.phone, args.db))
+        return 0
     if args.cmd == "serve":
         app = Surfaces(settings)
-        try:
-            from . import callback, door  # noqa: F401  (registers hook routes and wires managers)
-            callback.wire(app)
-            door.wire(app)
-        except ImportError:
-            pass
+        from . import callback, door
+        callback.wire(app)
+        door.wire(app)
         serve_forever(app)
     return 0
 
