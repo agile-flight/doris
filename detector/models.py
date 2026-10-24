@@ -79,3 +79,32 @@ class ExtractedInvoice(BaseModel):
     contact_change_detail: Optional[str] = Field(None, description="What contact detail it asks to change, if any.")
     urgency_phrases: list[str] = Field(default_factory=list, description="Short quoted phrases that create time pressure.")
     summary: str = Field("", description="One neutral sentence describing the message.")
+
+
+@dataclass
+class VendorOnFile:
+    """The vendor record as the checks see it: current values plus when each was last changed.
+
+    Built by detector.vendors from the versioned store. "On file" means unchanged for
+    Settings.on_file_days; see trusted_phone().
+    """
+    vendor_id: str
+    name: str
+    domain: Optional[str]
+    phone: Optional[str]
+    phone_since: Optional[datetime]
+    email: Optional[str]
+    email_since: Optional[datetime]
+    contact_name: Optional[str]
+    bank_last4: Optional[str]
+    bank_since: Optional[datetime]
+    payment_history: list[float]
+    last_contact_change_at: Optional[datetime]
+    created_at: datetime
+    last_contact_change_field: Optional[str] = None
+
+    def trusted_phone(self, now: datetime, on_file_days: int) -> tuple[Optional[str], Optional[datetime]]:
+        """The callback number, only if it has been on file unchanged for on_file_days."""
+        if self.phone and self.phone_since and (now - self.phone_since).days >= on_file_days:
+            return self.phone, self.phone_since
+        return None, None
