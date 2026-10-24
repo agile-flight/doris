@@ -95,7 +95,7 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 - [ ] Agent B: review screen + CT strip, callback (Cartesia + Twilio), forward-to-check door, BLOCKED screen (`surfaces/` is empty).
 - [x] Live Claude run: 5/5 fixtures correct. It found two bugs, now fixed: the extraction schema was rejected
   ("Schema is too complex", so Claude was silently skipped) and crt.sh retries made each check take 80-95 s.
-- [ ] Twilio needs the Account SID (starts `AC`) beside the API key and secret before it can place the callback.
+- [ ] Twilio: the Account SID is in, but the API key has no permissions (every call returns 401, error 8001). Create a **Standard** API key (Console, Account, API keys & tokens) or grant this restricted key Voice calls and phone-number access. Cartesia's key works.
 - [ ] Keys stay out of git: keep them in a file outside the repo (or `.env`, which is ignored) and share them with your teammate directly, not through GitHub.
 - [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
 
