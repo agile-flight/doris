@@ -63,14 +63,17 @@ def test_review_on_a_hold(surfaces, detector):
     assert "On hold" in html and "Approve payment" in html
     status, html, _, _ = http("POST", f"{surfaces.dash_url}/d/{held['decision_id']}/review", {"approve": "yes"})
     assert "Give your name" in html
-    status, html, _, url = http("POST", f"{surfaces.dash_url}/d/{held['decision_id']}/review", {"approve": "yes", "reviewer": "Judge"})
-    assert status == 200 and "Paid" in html and "Judge" in html
+    status, html, _, _ = http("POST", f"{surfaces.dash_url}/d/{held['decision_id']}/review", {"approve": "yes", "reviewer": "Judge"})
+    assert "say how you verified it" in html and "On hold" in html
+    status, html, _, url = http("POST", f"{surfaces.dash_url}/d/{held['decision_id']}/review",
+                                {"approve": "yes", "reviewer": "Judge", "method": "called", "source": "number on their website"})
+    assert status == 200 and "Paid" in html and "Judge" in html and "number on their website" in html
 
 
 def test_detector_refusal_is_shown_not_crashed(surfaces):
     _, _, _, url = http("POST", surfaces.dash_url + "/demo/send")
     first = decision_id_from(url)
-    status, html, _, _ = http("POST", f"{surfaces.dash_url}/d/{first}/review", {"approve": "yes", "reviewer": "x"})
+    status, html, _, _ = http("POST", f"{surfaces.dash_url}/d/{first}/review", {"approve": "yes", "reviewer": "x", "method": "record", "source": "PO 7781", "young_ok": "yes"})
     assert status == 400 and "detector said" in html
 
 

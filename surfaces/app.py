@@ -213,7 +213,21 @@ class DashboardHandler(_Base):
             approve = form.get("approve")
             if approve not in ("yes", "no") or not form.get("reviewer", "").strip():
                 return self.redirect(f"/d/{quote(decision_id)}?flash=" + quote("Give your name and choose approve or reject."))
-            follow = self.app.client.review(decision_id, approve=approve == "yes", reviewer=form["reviewer"].strip()[:80], notes=form.get("notes", "")[:500])
+            notes = form.get("notes", "").strip()[:300]
+            if approve == "yes":
+                d = self.app.client.get(decision_id)
+                method, source = form.get("method", ""), form.get("source", "").strip()[:200]
+                age = render.domain_age_days(d)
+                if method not in render.VERIFY_METHODS or len(source) < 3:
+                    return self.redirect(f"/d/{quote(decision_id)}?flash=" + quote(
+                        "To approve, say how you verified it and where that number or record came from."))
+                if age is not None and age < render.YOUNG_DOMAIN_DAYS and form.get("young_ok") != "yes":
+                    return self.redirect(f"/d/{quote(decision_id)}?flash=" + quote(
+                        f"This sender's domain is only {age} days old. Tick the box to confirm you saw that."))
+                notes = (f"Verified: {render.VERIFY_METHODS[method]}. Source: {source}."
+                         + (f" Acknowledged the domain is {age} days old." if age is not None and age < render.YOUNG_DOMAIN_DAYS else "")
+                         + (f" {notes}" if notes else ""))
+            follow = self.app.client.review(decision_id, approve=approve == "yes", reviewer=form["reviewer"].strip()[:80], notes=notes[:500])
             return self.redirect(f"/d/{quote(follow['decision_id'])}")
         if action == "manual_callback":
             confirmed = form.get("confirmed")

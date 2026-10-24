@@ -53,6 +53,16 @@ Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen no
 Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
 Feedback links open a page whose button records the label, so link scanners can't.
 
+## AI fraud: a hijacked line, a cloned voice, forged documents
+
+- After a vendor says yes twice, Doris asks the amount of the last payment we sent them (read from the payment
+  history on file, never spoken by Doris). A match releases the money. A wrong guess, "no idea", or no history on
+  file leaves the payment frozen for a person: a quiz never blocks a real vendor, and a denial still blocks at once.
+- Approving any held payment needs how it was verified (called a number found independently, an existing contract
+  or PO, the attachment checked by hand, or in person) and where that number or record came from. The email's own
+  contact details are marked untrusted; a sender domain under 90 days old needs an explicit acknowledgment. All of
+  it is written into the audit chain with the review.
+
 ## Roles and the bounty
 
 `--role demo` runs the dashboard, the callback and the AP inbox; `--role bounty` runs only the check@ door, so

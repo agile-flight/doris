@@ -108,6 +108,13 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 - [ ] Keys stay out of git: keep them in a file outside the repo (or `.env`, which is ignored) and share them with your teammate directly, not through GitHub.
 - [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
 
+## AI fraud (2026-10-24)
+Two gaps closed in surfaces: a hijacked vendor line answered by a cloned voice must also know the last payment on
+file before money moves (a miss leaves it frozen, never blocked); approving a held payment requires saying how it
+was verified and from what source, with a young sender domain acknowledged. Tests: `surfaces/tests/test_ai_fraud.py`.
+Still open: a vendor whose mailbox is compromised (vendor email compromise) can know invoice amounts; a second
+channel, a code emailed to the address on file, would cover it once Postmark is configured.
+
 ## Calls made that interpret the build doc
 - Hidden HTML text in the email body blocks only when it carries instructions (approve, ignore, do not flag, AI-addressed). Templated vendor mail hides preheaders by design; blocking those would wreck the false-positive rate. Hidden PDF text still blocks on any meaningful words.
 - A message that claims a bank change always earns the callback, even when the account's last 4 match the record.

@@ -61,7 +61,58 @@ def lines(decision: dict, company: str) -> dict[str, str]:
         "confirmed": "Thanks for confirming. I'll update our records and release the payment. Bye now.",
         "unclear": "No problem. I'll hold the payment and someone from our team will call you back. Goodbye.",
         "handled": "Thanks for picking up. This one has already been taken care of, so there's nothing you need to do. Bye now.",
+        "verify": ("One last check, hon, so I know it's really you: what was the amount of the last payment we sent you? "
+                   "You can say it, or type it in whole dollars and press pound."),
+        "verify_failed": "Thanks. I couldn't match that to our records, so I'll hold the payment and someone from our team will follow up. Goodbye.",
     }
+
+
+_SMALL = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+                                      "fifteen sixteen seventeen eighteen nineteen".split())}
+_TENS = {w: 10 * (i + 2) for i, w in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split())}
+
+
+def words_to_number(text: str) -> Optional[int]:
+    """'four thousand six hundred fifty' -> 4650; also the spoken 'forty six fifty' -> 4650."""
+    total, current, seen = 0, 0, False
+    for tok in re.findall(r"[a-z]+", text.lower()):
+        if tok in _SMALL:
+            current += _SMALL[tok]
+        elif tok in _TENS:
+            if 0 < current < 100 and current % 10 and not total:     # "forty six | fifty": hundreds then tens
+                current = current * 100
+            current += _TENS[tok]
+        elif tok == "hundred":
+            current = (current or 1) * 100
+        elif tok == "thousand":
+            total += (current or 1) * 1000
+            current = 0
+        elif tok in ("and", "a", "dollars", "dollar", "bucks", "uh", "um", "it", "was", "about", "like"):
+            continue
+        elif tok in ("point", "cents"):
+            break
+        else:
+            if seen:
+                break
+            continue
+        seen = True
+    return total + current if seen else None
+
+
+def spoken_amount(speech: str = "", digits: str = "") -> Optional[float]:
+    """The dollar amount someone said or typed, or None."""
+    if digits:
+        d = re.sub(r"\D", "", digits)
+        return float(d) if d else None
+    text = (speech or "").lower().replace(",", "")
+    m = re.search(r"(\d+(?:\.\d{1,2})?)\s*thousand(?:\s*(?:and\s*)?(\d+))?", text)
+    if m:
+        return float(m.group(1)) * 1000 + float(m.group(2) or 0)
+    m = re.search(r"\d+(?:\.\d{1,2})?", text)
+    if m:
+        return float(m.group(0))
+    n = words_to_number(text)
+    return float(n) if n is not None else None
 
 
 _NO = re.compile(r"\b(no|nope|never|didn'?t|did not|haven'?t|have not|hasn'?t|has not|not us|wasn'?t us|was not us|not from us|fraud|scam|fake)\b")
@@ -135,7 +186,7 @@ class CallManager:
         return token
 
     def _prerender(self, script: dict) -> None:
-        for key in ("reprompt", "confirm", "denied", "confirmed", "unclear", "handled"):
+        for key in ("reprompt", "confirm", "verify", "verify_failed", "denied", "confirmed", "unclear", "handled"):
             try:
                 self.voice.render(script[key])
             except Exception:  # noqa: BLE001  (a missing line falls back to Twilio's voice)
@@ -172,12 +223,23 @@ class CallManager:
             return f"<Play>{xml_escape(f'{self.base}/audio/{name}')}</Play>"
         return f'<Say voice="Polly.Joanna">{xml_escape(text)}</Say>'
 
-    def _gather(self, token: str, text: str) -> str:
+    def _gather(self, token: str, text: str, amount: bool = False) -> str:
         action = xml_escape(f"{self.base}/twilio/{token}/gather")
+        keys = 'finishOnKey="#" timeout="8"' if amount else 'numDigits="1" timeout="6"'
+        hints = "dollars, thousand, hundred" if amount else "yes, no, never, we never changed our bank"
         # bargeIn="false": nothing said while Doris is still asking counts as the answer.
-        return (f'<Gather input="speech dtmf" numDigits="1" timeout="6" speechTimeout="auto" bargeIn="false" language="en-US" '
-                f'hints="yes, no, never, we never changed our bank" action="{action}" method="POST">{self._speak(text)}</Gather>'
+        return (f'<Gather input="speech dtmf" {keys} speechTimeout="auto" bargeIn="false" language="en-US" '
+                f'hints="{hints}" action="{action}" method="POST">{self._speak(text)}</Gather>'
                 f'<Redirect method="POST">{action}</Redirect>')
+
+    def _last_payment(self, decision: dict) -> Optional[float]:
+        """The most recent payment on file for this vendor: something only the real vendor would know."""
+        try:
+            record = self.app.client.vendor(decision.get("vendor_id"))
+        except DetectorError:
+            return None
+        history = (record or {}).get("payment_history") or []
+        return float(history[-1]) if history else None
 
     def _accepts(self, token: str) -> Optional[dict]:
         """The call, if this token is the newest live call for its decision and has no answer yet."""
@@ -210,8 +272,21 @@ class CallManager:
         decision = self.app.client.get(call["decision_id"])
         script = lines(decision, self.app.settings.company)
         speech = (form.get("SpeechResult") or "").strip()[:200]
-        digits = (form.get("Digits") or "").strip()[:2]
-        outcome = classify(speech, digits)
+        digits = (form.get("Digits") or "").strip()[:12]
+        if call.get("stage") == "verifying":
+            # The records check. A hijacked line or a cloned voice still has to know what only the vendor knows.
+            # A miss never blocks a real vendor: it leaves the payment frozen for a person.
+            amount, expected = spoken_amount(speech, digits), self._last_payment(decision)
+            answer = speech or (f"typed {digits}" if digits else "no answer")
+            if amount is not None and expected is not None and abs(amount - expected) <= 1.0:
+                said = f"{call.get('notes')}; last payment we sent: {answer} (matches the record on file)"
+                self.app.store.update_call(token, status="saving", result=said, stage="confirmed")
+                self._post(token, call["decision_id"], "confirmed", said, decision.get("callback_number"))
+                return f"<Response>{self._speak(script['confirmed'])}<Hangup/></Response>"
+            said = f"{call.get('notes')}; last payment we sent: {answer} (does not match the record on file)"
+            self.app.store.update_call(token, status="inconclusive", result=said, stage="failed-check")
+            return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
+        outcome = classify(speech, digits[:1] if digits else "")
         said = speech or (f"pressed {digits}" if digits else "")
         if outcome == "confirmed" and call.get("stage") != "confirming":
             self.app.store.update_call(token, stage="confirming", notes=said)
@@ -224,6 +299,12 @@ class CallManager:
             return f"<Response>{self._speak(script['unclear'])}<Hangup/></Response>"
         if outcome == "confirmed":
             said = f"{call.get('notes') or 'yes'}; then, asked again: {said}"
+            if self._last_payment(decision) is None:
+                self.app.store.update_call(token, status="inconclusive", stage="failed-check",
+                                           result=f"{said}; no payment history on file to check against")
+                return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
+            self.app.store.update_call(token, stage="verifying", notes=said)
+            return f"<Response>{self._gather(token, script['verify'], amount=True)}</Response>"
         self.app.store.update_call(token, status="saving", result=said or outcome, stage=outcome)
         self._post(token, call["decision_id"], outcome, said or outcome, decision.get("callback_number"))
         return f"<Response>{self._speak(script[outcome])}<Hangup/></Response>"

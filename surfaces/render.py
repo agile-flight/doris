@@ -318,12 +318,55 @@ def callback_panel(d: dict, call_text: str, can_call: bool) -> str:
             f'<p id="call-status" class="quiet">{esc(call_text)}</p>{button}{manual}</section>')
 
 
+VERIFY_METHODS = {
+    "called": "Called them on a number I found myself, not one from this email",
+    "record": "It matches a contract, PO or record we already had",
+    "attachment": "I opened the attachment myself and checked it against our records",
+    "in_person": "Verified in person",
+}
+YOUNG_DOMAIN_DAYS = 90
+
+
+def domain_age_days(d: dict) -> Optional[int]:
+    """Days between the sender domain's first certificate and when Doris checked the email, if known."""
+    checked = parse_ts(d.get("created_at"))
+    first = next((parse_ts(e.get("at")) for e in d.get("ct_timeline") or []
+                  if e.get("kind") == "cert_first_seen" and e.get("domain") == d.get("sender_domain")), None)
+    if not (checked and first):
+        return None
+    return max(0, (checked - first).days)
+
+
 def review_panel(d: dict) -> str:
-    return ('<section class="panel"><h2>Human review</h2><form class="inline" method="post" action="/d/{0}/review">'
+    """Approving a held payment is a control, not a click: the reviewer says how they verified it, and from what."""
+    new_vendor = any(s.get("name") == "new_vendor" and s.get("fired") for s in d.get("signals") or [])
+    age = domain_age_days(d)
+    lead = ("First-time vendor: Doris has nothing on file to check this against, and documents can be forged. "
+            "Before approving, confirm it yourself using contact details you found independently." if new_vendor else
+            "Before approving, confirm the payment details yourself through a channel you already trusted.")
+    untrusted = (f'<p class="quiet">From this email, so untrusted: {esc(d.get("sender_email") or d.get("sender_domain") or "the sender")}'
+                 " and any phone number, link or address in it.</p>")
+    evidence = ""
+    young = ""
+    if age is not None:
+        span = f"{age // 365} years" if age >= 730 else f"{age} days"
+        evidence = f'<p>{esc(d.get("sender_domain"))} got its first certificate {span} before this email.</p>'
+        if age < YOUNG_DOMAIN_DAYS:
+            young = (f'<label style="display:block;margin-top:6px"><input type="checkbox" name="young_ok" value="yes"> '
+                     f'I know {esc(d.get("sender_domain"))} is only {age} days old</label>')
+    options = "".join(f'<option value="{esc(k)}">{esc(v)}</option>' for k, v in VERIFY_METHODS.items())
+    return ('<section class="panel"><h2>Human review</h2>'
+            f'<p style="margin-top:0">{esc(lead)}</p>{untrusted}{evidence}'
+            f'<form method="post" action="/d/{esc(d.get("decision_id"))}/review">'
+            '<div class="inline" style="display:flex;gap:8px;flex-wrap:wrap">'
             '<input type="text" name="reviewer" placeholder="Your name" aria-label="Reviewer" required>'
-            '<input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes">'
+            f'<select name="method" aria-label="How you verified it"><option value="">How did you verify it?</option>{options}</select>'
+            '<input type="text" name="source" placeholder="Where that number or record came from" aria-label="Source" style="min-width:260px">'
+            '<input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes"></div>'
+            f'{young}<div class="inline" style="display:flex;gap:8px;margin-top:8px">'
             '<button name="approve" value="yes">Approve payment</button><button name="approve" value="no" class="danger">Reject</button>'
-            '</form></section>').format(esc(d.get("decision_id")))
+            '</div><p class="quiet" style="margin:6px 0 0">Approving needs how you verified it and where from. Rejecting needs only your name.</p>'
+            '</form></section>')
 
 
 def safe(fn, *args, **kwargs) -> str:

@@ -10,3 +10,5 @@ Append dated notes here when anything A reads changes: what the review screen ne
   through as is). B now measures ages against `created_at`, but a future `invoice_received` still looks odd on screen.
   Suggest clamping it to the check time.
 - B's door uses `bank_account_changed.evidence.claimed_change` for first-time senders. Please keep that key.
+- B now reads `GET /vendors` (payment_history, vendor_id) for the callback's records check. Please keep that route
+  and the order of payment_history (oldest first).
