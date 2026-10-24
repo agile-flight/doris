@@ -27,6 +27,7 @@ uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python -e ".[de
 .venv/bin/python -m detector --offline check detector/fixtures/emails/bank_change_lookalike.eml
 .venv/bin/python -m detector serve        # API on http://127.0.0.1:8787 for the surfaces
 .venv/bin/python -m detector evaluate     # confusion matrix: catch rate AND false-positive rate
+.venv/bin/python -m detector --offline evaluate --testset detector/testset/cases_doj.json   # the DOJ-derived set
 .venv/bin/python -m detector samples      # regenerate contract/samples from the pipeline
 ```
 

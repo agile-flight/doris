@@ -12,5 +12,9 @@ audit log and written to `data/outbox/<decision_id>.json`.
 - Public surface for Agent B: `from detector import Doris` and `python -m detector serve` (see `contract/README.md`).
 - Evidence: `.venv/bin/python -m detector evaluate` prints the confusion matrix on `detector/testset/cases.json`
   and writes `data/evidence/confusion_matrix.json` (served at `GET /evaluation`). Report catch rate AND false-positive rate.
+- DOJ-derived set (separate deliverable): `detector/testset/cases_doj.json`, 12 reconstructions of public
+  DOJ/IC3 BEC typologies plus 8 legitimate controls; run with
+  `.venv/bin/python -m detector --offline evaluate --testset detector/testset/cases_doj.json`.
+  `tests/test_evaluate.py` pins the result and why each case is caught.
 - Slices and their checks: ingest/extract (fixture diff), signals (one test each; white-text invoice = max risk),
   risk score (confusion matrix), audit chain (tamper test), vendor versioning (89-day number never used).

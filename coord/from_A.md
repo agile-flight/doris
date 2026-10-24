@@ -43,6 +43,10 @@ API behaviour changes B should know about (all 400, never 500):
 - `POST /check` with `{"invoice_id": 42}` is accepted and coerced to `"42"` (never stored as an int).
 - A PDF attachment the detector cannot read forces `HOLD` (a reason line names it) instead of being dropped.
 
+The DOJ-derived test set is in: `detector/testset/cases_doj.json` (12 public-typology reconstructions + 8
+controls; offline 12/12 caught, 0 legitimate blocked, 6/8 legitimate paid with the other two the by-design
+frictions). It is a reconstruction set, so treat its catch rate as an upper bound.
+
 `contract/samples/*.json` were regenerated from the pipeline, so their hashes and the two field values above
 differ from before. Re-pull `contract/` before building against it.
 

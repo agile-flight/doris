@@ -4,8 +4,9 @@ Build doc (plan, pitch, workflow): https://claude.ai/artifact/JydSXjC5Tii6o69WBu
 Repo: https://github.com/agile-flight/doris · Submission deadline: Sun 2026-10-25, 9 AM, at the venue.
 
 ## Where it stands (2026-10-23, later)
-Agent A's detector is complete end to end and offline-testable: 208 tests pass, the contract check passes,
-the confusion matrix runs (14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design). The live Claude
+Agent A's detector is complete end to end and offline-testable: 211 tests pass, the contract check passes,
+the confusion matrix runs (14/15 fraud stopped, 0/12 legitimate blocked, 2/12 held by design), and the
+DOJ-derived set runs clean (12/12 fraud stopped, 0 blocked outright). The live Claude
 path has never run (no API key on the build machine). A fresh-context adversarial review found 20 gaps; **all 20
 are now fixed** (see the per-finding list below) — the detector no longer accepts a non-boolean callback verdict, a
 callback from an untrusted number, a double resolution, or a reviewed prompt-injection block, and it reads hidden
@@ -73,8 +74,14 @@ Each was done tests-first; the reproduction for each is now a test. The list, wi
 | 19 | the audit `kind` column was not sealed | sealed into the hash (fixed before this pass) | `test_audit.py` |
 | 20 | `amount_anomaly` alone could never reach HOLD; a $10^23 invoice paid | extreme amounts (> 3x max history) carry weight `high`; an absolute ceiling holds any invoice | `test_checks.py::test_amount_anomaly_absolute_ceiling_holds_a_new_vendor`, `::test_amount_anomaly_fires_far_above_median` |
 
-Then: a third teammate builds the DOJ-derived test set against `detector/testset/cases.json`'s format
-(`detector/testset/cases_doj.json`, run with `python -m detector evaluate --testset ...`).
+Then: the DOJ-derived test set is at `detector/testset/cases_doj.json` — 12 fraud typologies reconstructed
+from public DOJ/IC3 BEC material (Rimasauskas, Okeke, Abbas/Hushpuppi, and the vendor-email-compromise,
+lookalike-domain, free-webmail, reply-to-pivot, urgency, under-threshold and hidden-text typologies), plus
+8 legitimate controls. Offline: **12/12 fraud stopped, 0 blocked outright, 6/8 legitimate paid** — the two
+non-PAY controls are the by-design frictions (a genuine bank change is CALLBACK, a first-time vendor is HOLD).
+Run it with `python -m detector --offline evaluate --testset detector/testset/cases_doj.json`. It is a
+reconstruction set written by someone who knows what the detector checks, so treat the catch rate as an upper
+bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and the reason each case is caught.
 
 ## Calls made that interpret the build doc
 - A bank change with a number on file 90+ days is always `CALLBACK`, even at a high score; the call is the verification and the best evidence. Only prompt injection blocks outright (score floored at 0.95).

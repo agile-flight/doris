@@ -28,7 +28,8 @@ rules are in [contract/README.md](contract/README.md).
 - Agent B: surfaces/, review screen and certificate timeline, forward-to-check
   flow, Cartesia/Twilio callback integration, and blocked-result screen.
 - Both: contract/ schema and six sample decisions; coordinate before changes.
-- Additional test-set work: DOJ-derived labelled cases in the existing format.
+- Additional test-set work: DOJ-derived labelled cases in the existing format —
+  done, in `detector/testset/cases_doj.json` (separate from the main confusion matrix).
 
 ## Demo integration
 
@@ -40,12 +41,20 @@ The review screen uses ct_timeline; GET /evaluation exposes matrix results.
 
 ## Verified state — October 23, 2026
 
-162 tests and the 26-test contract check pass. Offline evaluation stops 14/15
-fraud cases; 10/12 legitimate cases PAY, one HOLD and one CALLBACK. No legitimate
-case is BLOCKED. The missed fraud case is fraud_iban_soft_language.
-Agent B implementation is still pending. Live Claude calls have not been tested.
-Passing tests do not close the known review findings: see HANDOFF.md for the
-prioritized backlog, especially callback validation and follow-up state rules.
+211 tests and the 26-test contract check pass. All 20 adversarial-review findings are
+closed (see HANDOFF.md). Offline evaluation stops 14/15 fraud cases; 10/12 legitimate
+cases PAY, one HOLD and one CALLBACK. No legitimate case is BLOCKED. The missed fraud
+case is fraud_iban_soft_language.
 
-Next: complete Agent B's surfaces, address the review backlog, validate a live
-model configuration only with a deliberate API budget, and rehearse the demo.
+The DOJ-derived set (`detector/testset/cases_doj.json`) is in: 12 reconstructions of
+publicly reported DOJ/IC3 BEC typologies plus 8 legitimate controls. Offline it stops
+12/12 fraud cases, blocks no legitimate invoice outright, and pays 6/8 legitimate ones
+(the other two are the by-design frictions: a genuine bank change is CALLBACK, a
+first-time vendor is HOLD). Because it is a reconstruction set, the catch rate is an
+upper bound, not a field estimate:
+`python -m detector --offline evaluate --testset detector/testset/cases_doj.json`.
+
+Agent B implementation is still pending. Live Claude calls have not been tested.
+
+Next: complete Agent B's surfaces, validate a live model configuration only with a
+deliberate API budget, and rehearse the demo.
