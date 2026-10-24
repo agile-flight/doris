@@ -1,0 +1,55 @@
+{
+  "vendors": [
+    {
+      "vendor_id": "ven_acme_supply",
+      "name": "Acme Supply Co.",
+      "domain": "acmesupply.com",
+      "phone": "+14155550123",
+      "email": "billing@acmesupply.com",
+      "contact_name": "Dana Whitfield",
+      "bank_last4": "1234",
+      "since": "2021-03-10T17:22:00Z",
+      "payments": [
+        {"amount": 4650.0, "paid_at": "2026-05-15T16:00:00Z", "invoice_id": "INV-0988"},
+        {"amount": 4820.0, "paid_at": "2026-06-14T16:00:00Z", "invoice_id": "INV-0997"},
+        {"amount": 4400.0, "paid_at": "2026-07-15T16:00:00Z", "invoice_id": "INV-1006"},
+        {"amount": 4900.0, "paid_at": "2026-08-14T16:00:00Z", "invoice_id": "INV-1019"},
+        {"amount": 4650.0, "paid_at": "2026-09-15T16:00:00Z", "invoice_id": "INV-1030"}
+      ]
+    },
+    {
+      "vendor_id": "ven_lakeside_it",
+      "name": "Lakeside IT Services LLC",
+      "domain": "lakesideit.com",
+      "phone": "+13125550177",
+      "email": "ar@lakesideit.com",
+      "contact_name": "Marcus Lee",
+      "bank_last4": "7730",
+      "since": "2023-01-20T15:00:00Z",
+      "payments": [
+        {"amount": 2200.0, "paid_at": "2026-06-30T16:00:00Z", "invoice_id": "LIT-4410"},
+        {"amount": 2200.0, "paid_at": "2026-07-31T16:00:00Z", "invoice_id": "LIT-4471"},
+        {"amount": 2350.0, "paid_at": "2026-08-31T16:00:00Z", "invoice_id": "LIT-4530"},
+        {"amount": 2200.0, "paid_at": "2026-09-30T16:00:00Z", "invoice_id": "LIT-4592"}
+      ]
+    },
+    {
+      "vendor_id": "ven_bayview_janitorial",
+      "name": "Bayview Janitorial Inc.",
+      "domain": "bayviewjanitorial.com",
+      "phone": "+15105550144",
+      "email": "office@bayviewjanitorial.com",
+      "contact_name": "Rosa Delgado",
+      "bank_last4": "2208",
+      "since": "2019-08-02T18:30:00Z",
+      "payments": [
+        {"amount": 1800.0, "paid_at": "2026-04-30T16:00:00Z", "invoice_id": "BJ-2203"},
+        {"amount": 1800.0, "paid_at": "2026-05-31T16:00:00Z", "invoice_id": "BJ-2241"},
+        {"amount": 1800.0, "paid_at": "2026-06-30T16:00:00Z", "invoice_id": "BJ-2280"},
+        {"amount": 1950.0, "paid_at": "2026-07-31T16:00:00Z", "invoice_id": "BJ-2319"},
+        {"amount": 1800.0, "paid_at": "2026-08-31T16:00:00Z", "invoice_id": "BJ-2360"},
+        {"amount": 1800.0, "paid_at": "2026-09-30T16:00:00Z", "invoice_id": "BJ-2401"}
+      ]
+    }
+  ]
+}
