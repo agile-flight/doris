@@ -27,7 +27,31 @@ def test_verdict_suspicious_band():
     d = {"decision": "HOLD", "risk_score": 0.2, "signals": [{"name": "payee_name_mismatch", "fired": True}]}
     assert door.verdict(d) == "suspicious"
     assert door.verdict({"decision": "HOLD", "risk_score": 0.35, "signals": []}) == "suspicious"
-    assert door.verdict({"decision": "PAY", "risk_score": 0.06, "signals": [{"name": "urgency_language", "fired": True}]}) == "safe"
+    known = {"decision": "PAY", "risk_score": 0.06, "vendor_id": "ven_acme_supply", "signals": [{"name": "urgency_language", "fired": True}]}
+    assert door.verdict(known) == "safe", "a real vendor's reminder with pressure words is fine"
+
+
+def bank(claimed, fired=False):
+    return {"name": "bank_account_changed", "fired": fired, "weight": "highest", "detail": "", "evidence": {"claimed_change": claimed}}
+
+
+@pytest.mark.parametrize("signals,want", [
+    ([bank(True)], "suspicious"),                                                       # stranger asks to pay a new account
+    ([bank(True), {"name": "urgency_language", "fired": True}], "scam"),                 # ...and rushes you
+    ([bank(False), {"name": "urgency_language", "fired": True}], "suspicious"),          # CEO "urgent wire", gift cards
+    ([bank(False)], "safe"),
+    ([bank(False), {"name": "llm_judgment", "fired": True, "evidence": {"status": "ok", "risk": 0.9}}], "scam"),
+    ([bank(False), {"name": "llm_judgment", "fired": False, "evidence": {"status": "ok", "risk": 0.45}}], "suspicious"),
+])
+def test_verdict_for_strangers_reads_the_claim_not_the_record(signals, want):
+    assert door.verdict({"decision": "HOLD", "risk_score": 0.06, "vendor_id": None, "signals": signals}) == want
+
+
+def test_safe_reply_says_when_the_ai_read_did_not_run():
+    d = {"decision": "HOLD", "risk_score": 0.0, "vendor_id": None, "reasons": [], "decision_id": "dec_x",
+         "signals": [bank(False), {"name": "llm_judgment", "fired": False, "evidence": {"status": "skipped"}}]}
+    text = door.reply_text(d, "safe", "https://x/feedback/t")
+    assert text.startswith("Doris says: NO RED FLAGS FOUND.") and "didn't run" in text and "LOOKS SAFE" not in text
 
 
 def test_reply_text_is_for_the_forwarder_not_the_ap_clerk():
@@ -88,9 +112,12 @@ def test_forwarded_scam_gets_a_verdict_reply_within_60_seconds(opened):
     assert "Doris says: SCAM." in body and "acme-supply.co" in body
     token = files[0].stem
     status, html, _, _ = http("GET", f"{opened.hooks_url}/feedback/{token}/up")
+    assert status == 200 and "Yes, record it" in html and opened.store.stats()["up"] == 0, "a link scanner's GET records nothing"
+    status, html, _, _ = http("POST", f"{opened.hooks_url}/feedback/{token}/up")
     assert status == 200 and "Thanks" in html
+    assert http("POST", f"{opened.hooks_url}/feedback/{token}/down")[0] == 404, "first answer wins"
     assert opened.store.stats()["checks"] == 1 and opened.store.stats()["scam"] == 1 and opened.store.stats()["up"] == 1
-    assert http("GET", f"{opened.hooks_url}/feedback/{'z' * 22}/down")[0] == 404
+    assert http("POST", f"{opened.hooks_url}/feedback/{'z' * 22}/down")[0] == 404
 
 
 def test_raw_rfc822_and_attachments_via_postmark(opened):
@@ -161,15 +188,14 @@ def test_no_replies_to_automated_mail_or_ourselves(opened):
 
 
 def test_ap_inbox_mail_lands_on_the_dashboard_and_can_auto_call(opened):
-    opened.settings.extra["ap_address"] = "ap@doris.test"
     called = []
     class FakeCalls:
         def start(self, d):
             called.append(d["decision_id"])
     opened.callbacks = FakeCalls()
     opened.settings.auto_call = True
-    raw = (ROOT / "surfaces/demo/bank_change_demo.eml").read_bytes().replace(b"ap@calhacksrobotics.com", b"ap@doris.test")
-    assert opened.door.accept(raw) == "ap: CALLBACK"
+    raw = (ROOT / "surfaces/demo/bank_change_demo.eml").read_bytes()
+    assert opened.door.accept(raw, mode="ap") == "ap: CALLBACK"
     assert len(called) == 1
     assert wait_for_reply(opened, timeout=2)[0] == [], "the AP inbox never gets a reply"
     state = json.loads(http("GET", f"{opened.dash_url}/latest/state")[1])

@@ -111,6 +111,9 @@ def test_keypress_yes_confirms(wired):
     http("POST", f"{wired.dash_url}/d/{first}/call")
     token = token_of(wired)
     http("POST", f"{wired.hooks_url}/twilio/{token}/voice")
+    _, twiml, _, _ = http("POST", f"{wired.hooks_url}/twilio/{token}/gather", {"Digits": "1"})
+    assert "<Gather" in twiml, "a yes is confirmed before money moves"
+    assert json.loads(http("GET", f"{wired.dash_url}/d/{first}/state")[1])["decision"] == "CALLBACK"
     http("POST", f"{wired.hooks_url}/twilio/{token}/gather", {"Digits": "1"})
     state = json.loads(http("GET", f"{wired.dash_url}/d/{first}/state")[1])
     assert state["decision"] == "PAY"

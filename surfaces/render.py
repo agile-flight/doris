@@ -222,7 +222,9 @@ def ct_strip(d: dict) -> str:
     if not events:
         return ""
     inv = next((e for e in events if e.get("kind") == "invoice_received"), None)
-    t_inv = parse_ts(inv["at"]) if inv else max(parse_ts(e["at"]) for e in events)
+    # Ages are measured on Doris's clock (when she checked), never the sender's Date header.
+    checked = parse_ts(d.get("created_at")) or datetime.now(timezone.utc)
+    t_inv = min(parse_ts(inv["at"]), checked) if inv else min(max(parse_ts(e["at"]) for e in events), checked)
     domains: list[str] = []
     for e in events:
         if e.get("kind") != "invoice_received" and e["domain"] not in domains:
@@ -271,7 +273,7 @@ def ct_strip(d: dict) -> str:
         for e in events:
             if e["domain"] != dom or e.get("kind") == "invoice_received":
                 continue
-            ex = x(parse_ts(e["at"]))
+            ex = x(min(parse_ts(e["at"]), t_inv + timedelta(days=1)))
             kind = e.get("kind")
             if kind == "cert_first_seen":
                 c = "bad" if dom in young else "good"
@@ -286,7 +288,7 @@ def ct_strip(d: dict) -> str:
     if inv:
         ix = x(t_inv)
         parts.append(f'<line class="inv" x1="{ix:.1f}" y1="{top - 4}" x2="{ix:.1f}" y2="{H - 24}" stroke-dasharray="4 3" stroke-width="2"/>'
-                     f'<text class="invt" x="{min(ix, RIGHT - 4):.1f}" y="{H - 8}" text-anchor="end">Invoice {esc(when(inv["at"], "short"))}</text>')
+                     f'<text class="invt" x="{min(ix, RIGHT - 4):.1f}" y="{H - 8}" text-anchor="end">Invoice {esc(when(t_inv.isoformat(), "short"))}</text>')
     parts.append("</svg>")
     caption = []
     for dom in domains:
@@ -324,6 +326,16 @@ def review_panel(d: dict) -> str:
             '</form></section>').format(esc(d.get("decision_id")))
 
 
+def safe(fn, *args, **kwargs) -> str:
+    """Render one panel; if its data is too strange to draw, say so instead of failing the whole screen."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception:  # noqa: BLE001  (a demo screen must never 500 over one panel)
+        import logging
+        logging.getLogger("doris.render").exception("panel %s failed", getattr(fn, "__name__", fn))
+        return '<section class="panel"><p class="quiet" style="margin:0">This panel could not be drawn from this decision.</p></section>'
+
+
 def review_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Optional[bool] = None,
                   call_text: str = "", can_call: bool = False, poll: bool = True, flash: str = "") -> str:
     if d.get("decision") == "BLOCKED":
@@ -331,12 +343,12 @@ def review_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opti
     label, cls, line = VERDICT.get(d.get("decision"), (d.get("decision"), "hold", ""))
     body = [f'<p class="flash">{esc(flash)}</p>' if flash else "",
             f'<section class="banner v-{cls}"><h1>{esc(label)}</h1><p>{esc(line)} Risk {float(d.get("risk_score") or 0):.2f}.</p></section>',
-            summary(d), reasons(d)]
+            safe(summary, d), safe(reasons, d)]
     if d.get("decision") == "CALLBACK":
         body.append(callback_panel(d, call_text, can_call))
     if d.get("decision") == "HOLD":
         body.append(review_panel(d))
-    body += [hidden_text(d), ct_strip(d), signals_table(d), audit_trail(chain or [d], audit_ok)]
+    body += [safe(hidden_text, d), safe(ct_strip, d), safe(signals_table, d), safe(audit_trail, chain or [d], audit_ok)]
     url = f"/d/{d.get('decision_id')}/state" if poll else None
     return page(f"{label}: {d.get('invoice_id')}", "".join(body), poll=url, decision_id=d.get("decision_id"))
 
@@ -346,7 +358,7 @@ def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opt
     hero = (f'<section class="blocked-hero"><h1>BLOCKED</h1><p>{esc(headline)}</p>'
             f'<p style="font-size:16px;opacity:.9">{money(d.get("amount"), d.get("currency"))} to {esc(d.get("payee_name") or "an unknown payee")} '
             f'stays put. Risk {float(d.get("risk_score") or 0):.2f}.</p></section>')
-    body = hero + summary(d) + reasons(d) + hidden_text(d) + ct_strip(d) + audit_trail(chain or [d], audit_ok) + signals_table(d)
+    body = hero + "".join(safe(f, d) for f in (summary, reasons, hidden_text, ct_strip)) + safe(audit_trail, chain or [d], audit_ok) + safe(signals_table, d)
     url = f"/d/{d.get('decision_id')}/state" if poll else None
     return page(f"BLOCKED: {d.get('invoice_id')}", body, body_class="blocked-screen", poll=url, decision_id=d.get("decision_id"))
 

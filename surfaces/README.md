@@ -24,7 +24,7 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 | `DORIS_AUTO_CALL=1` | dial as soon as a CALLBACK arrives |
 | `CARTESIA_VOICE` | default Jolene (`d1d9c946-…`); `CARTESIA_MODEL` default `sonic-3` |
 | `DORIS_INBOUND_TOKEN` | secret path segment: the door listens at `/inbound/<token>` (16-64 chars) |
-| `DORIS_AP_ADDRESS` | mail to this address is checked and shown, never replied to |
+| `DORIS_AP_INBOUND_TOKEN` | secret for the AP inbox webhook `/inbound-ap/<token>`: checked, shown, auto-called, never replied to |
 | `POSTMARK_SERVER_TOKEN`, `DORIS_DOOR_FROM` | send replies; without them replies land in `data/surfaces/outbox/` |
 | `DORIS_BOUNTY_FREEZE_AT` | ISO time; after it the door stops checking (set it a few hours before you present) |
 
@@ -38,15 +38,20 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
    `DORIS_PUBLIC_URL` to the `https://….ts.net` address it prints.
 4. `TWILIO_FROM=+1… DORIS_AUTO_CALL=1 DORIS_PUBLIC_URL=https://… DORIS_KEYS_FILE=… .venv/bin/python -m surfaces serve`
 5. Dry run (the doc's check): open `/?live=1`, press "Send the demo bank-change email", answer the phone,
-   say "we never changed our bank". The screen flips to BLOCKED with the audit trail.
+   wait for Doris to finish asking (she ignores anything said while she talks), and say "we never changed our bank".
+   The screen flips to BLOCKED with the audit trail. A yes must be said twice; a hedge or silence leaves it frozen.
 
 ## Door (forward-to-check)
 
-Point Postmark's inbound webhook (or a Cloudflare Email Worker posting the raw message) at
-`$DORIS_PUBLIC_URL/inbound/$DORIS_INBOUND_TOKEN`. It answers 202 at once and replies in the background.
-Verdicts: scam (blocked, risk >= 0.7, prompt injection, or a lookalike asking for a bank change),
-suspicious (risk >= 0.3 or any strong signal), else safe. The new-vendor gate doesn't count here.
-Limits: 5 per sender per hour, 30 per minute, 5 MB. No replies to automated mail or to itself; never places calls.
+Point Postmark's inbound webhook (or a Cloudflare Email Worker posting the raw message) for check@ at
+`$DORIS_PUBLIC_URL/inbound/$DORIS_INBOUND_TOKEN`, and the AP inbox's at `/inbound-ap/$DORIS_AP_INBOUND_TOKEN`
+(a separate inbound address and secret; headers never pick the route). It answers 202 at once and replies in the background.
+Verdicts: scam (blocked, risk >= 0.7, prompt injection, a lookalike asking for a bank change, Claude's risk >= 0.7,
+or a stranger asking for a new account under pressure), suspicious (risk >= 0.3, any strong signal, Claude >= 0.4,
+or a stranger asking for a new account or pressing for speed), else "no red flags". The new-vendor gate doesn't count.
+Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen notes at most 1 per sender per hour.
+Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
+Feedback links open a page whose button records the label, so link scanners can't.
 
 ## Tests
 

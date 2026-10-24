@@ -46,9 +46,12 @@ class Surfaces:
         if not call:
             return "Not called yet." if self.settings.twilio_ready else "Telephony isn't configured: call the number on file and record the answer below."
         text = {"starting": "Placing the call…", "queued": "Dialing…", "initiated": "Dialing…", "ringing": "Ringing…",
-                "in-progress": "Doris is on the line.", "completed": "Call finished.", "busy": "Line busy. Try again.",
-                "no-answer": "No answer. Try again.", "failed": "The call failed.", "canceled": "Call canceled.",
-                "inconclusive": "No clear answer. Try again or record it below."}.get(call["status"], call["status"])
+                "answered": "Doris is on the line.", "in-progress": "Doris is on the line.", "completed": "Call finished.",
+                "busy": "Line busy. Try again.", "no-answer": "No answer. Try again.", "failed": "The call failed. Try again.",
+                "canceled": "Call canceled.", "inconclusive": "No clear answer. Try again or record it below.",
+                "saving": "Saving the vendor's answer…", "unsaved": "Doris couldn't save the answer. Record it below.",
+                "resolved-elsewhere": "Already resolved.", "stale": "The last call never reported back. Try again.",
+                "superseded": "Replaced by a newer call."}.get(call["status"], call["status"])
         if call.get("result"):
             text += f" Vendor said: {call['result']}."
         return text
@@ -61,14 +64,26 @@ class Surfaces:
                 log.warning("auto-call failed: %s", exc)
 
 
+def content_length(handler: BaseHTTPRequestHandler) -> int:
+    """The declared body length, or -1 if it is missing, negative or not a number."""
+    try:
+        n = int(handler.headers.get("Content-Length") or 0)
+    except ValueError:
+        return -1
+    return n if n >= 0 else -1
+
+
 def _form(handler: BaseHTTPRequestHandler, limit: int = 100_000) -> dict[str, str]:
-    length = min(int(handler.headers.get("Content-Length") or 0), limit)
-    raw = handler.rfile.read(length).decode("utf-8", errors="replace") if length else ""
+    length = content_length(handler)
+    if length <= 0 or length > limit:
+        return {}
+    raw = handler.rfile.read(length).decode("utf-8", errors="replace")
     return {k: v[0] for k, v in parse_qs(raw, keep_blank_values=True).items()}
 
 
 class _Base(BaseHTTPRequestHandler):
     server_version = "doris-surfaces/0.1"
+    timeout = 15          # a client that stops sending can't hold a thread
     app: Surfaces
 
     def log_message(self, fmt, *args):
@@ -81,6 +96,8 @@ class _Base(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
         for k, v in (headers or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -104,11 +121,30 @@ class _Base(BaseHTTPRequestHandler):
 
 
 class DashboardHandler(_Base):
+    """Localhost only. The Host check stops DNS rebinding; the Origin check stops other sites posting forms."""
+
+    def _allowed(self, post: bool) -> bool:
+        port = self.server.server_address[1]
+        hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+        if (self.headers.get("Host") or "") not in hosts:
+            self.send(403, b"forbidden host", "text/plain")
+            return False
+        if post:
+            origin = self.headers.get("Origin") or ""
+            referer = self.headers.get("Referer") or ""
+            ok = {f"http://{h}" for h in hosts}
+            if (origin and origin not in ok) or (not origin and referer and not any(referer.startswith(o + "/") or referer == o for o in ok)):
+                self.send(403, b"cross-site request refused", "text/plain")
+                return False
+        return True
+
     def do_GET(self):
-        self.guarded(self._get)
+        if self._allowed(False):
+            self.guarded(self._get)
 
     def do_POST(self):
-        self.guarded(self._post)
+        if self._allowed(True):
+            self.guarded(self._post)
 
     def _get(self):
         url = urlparse(self.path)

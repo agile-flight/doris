@@ -81,8 +81,8 @@ class Settings:
             inbound_token=env.get("DORIS_INBOUND_TOKEN", ""), postmark_token=env.get("POSTMARK_SERVER_TOKEN", ""),
             door_from=env.get("DORIS_DOOR_FROM", ""), bounty_freeze_at=env.get("DORIS_BOUNTY_FREEZE_AT", ""),
         )
-        if env.get("DORIS_AP_ADDRESS"):
-            s.extra["ap_address"] = env["DORIS_AP_ADDRESS"].strip().lower()
+        if env.get("DORIS_AP_INBOUND_TOKEN"):
+            s.extra["ap_inbound_token"] = env["DORIS_AP_INBOUND_TOKEN"].strip()
         for k, v in overrides.items():
             setattr(s, k, v)
         return s

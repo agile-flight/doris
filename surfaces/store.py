@@ -23,6 +23,9 @@ class Store:
                 "CREATE TABLE IF NOT EXISTS door_checks (token TEXT PRIMARY KEY, decision_id TEXT, verdict TEXT NOT NULL,"
                 " sender_hash TEXT NOT NULL, created_at REAL NOT NULL, feedback TEXT);"
                 "CREATE INDEX IF NOT EXISTS door_by_sender ON door_checks(sender_hash, created_at);")
+            cols = {r[1] for r in self._con.execute("PRAGMA table_info(calls)")}
+            if "stage" not in cols:
+                self._con.execute("ALTER TABLE calls ADD COLUMN stage TEXT")
             self._con.commit()
 
     def close(self) -> None:
@@ -37,7 +40,7 @@ class Store:
             self._con.commit()
 
     def update_call(self, token: str, **fields: Any) -> None:
-        allowed = {"status", "attempts", "result", "notes", "twilio_sid"}
+        allowed = {"status", "attempts", "result", "notes", "twilio_sid", "stage"}
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return
@@ -63,6 +66,21 @@ class Store:
                               (token, decision_id, verdict, sender_hash, time.time()))
             self._con.commit()
 
+    def reserve_check(self, token: str, sender_hash: str, verdict: str, *, per_sender_hour: int, per_minute: int) -> Optional[str]:
+        """Count and insert in one locked step, so a burst can't slip past the limits. None = reserved."""
+        now = time.time()
+        with self._lock:
+            n_sender = self._con.execute("SELECT COUNT(*) FROM door_checks WHERE created_at >= ? AND sender_hash = ?",
+                                         (now - 3600, sender_hash)).fetchone()[0]
+            if n_sender >= per_sender_hour:
+                return "sender rate limit"
+            if self._con.execute("SELECT COUNT(*) FROM door_checks WHERE created_at >= ?", (now - 60,)).fetchone()[0] >= per_minute:
+                return "global rate limit"
+            self._con.execute("INSERT INTO door_checks (token, decision_id, verdict, sender_hash, created_at) VALUES (?,?,?,?,?)",
+                              (token, None, verdict, sender_hash, now))
+            self._con.commit()
+        return None
+
     def count_checks(self, *, since: float, sender_hash: Optional[str] = None) -> int:
         sql, args = "SELECT COUNT(*) FROM door_checks WHERE created_at >= ?", [since]
         if sender_hash:
@@ -78,7 +96,7 @@ class Store:
 
     def set_feedback(self, token: str, value: str) -> bool:
         with self._lock:
-            cur = self._con.execute("UPDATE door_checks SET feedback = ? WHERE token = ? AND verdict IN ('safe','suspicious','scam')", (value, token))
+            cur = self._con.execute("UPDATE door_checks SET feedback = ? WHERE token = ? AND feedback IS NULL AND verdict IN ('safe','suspicious','scam')", (value, token))
             self._con.commit()
         return cur.rowcount == 1
 
