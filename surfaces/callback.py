@@ -295,7 +295,7 @@ class CallManager:
             self.app.store.update_call(token, status="resolved-elsewhere")
             return f"<Response>{self._speak(script['handled'])}<Hangup/></Response>"
         self.app.store.update_call(token, status="in-progress")
-        self._event(call["decision_id"], "system", "The vendor picked up", token)
+        self._event(call["decision_id"], "system", "They picked up", token)
         self._say(call, token, script["prompt"])
         return f"<Response>{self._gather(token, script['prompt'])}</Response>"
 

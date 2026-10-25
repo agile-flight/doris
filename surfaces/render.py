@@ -843,9 +843,15 @@ def trace_items(chain: list[dict], events: Optional[list[dict]] = None, live: bo
     label = VERDICT.get(d0.get("decision"), (d0.get("decision"), "", ""))[0]
     add("t-bad" if d0.get("decision") == "BLOCKED" else "t-good" if d0.get("decision") == "PAY" else "doris", "Decision",
         f"{label}: {(d0.get('reasons') or [''])[0]}")
+    person = str(d0.get("vendor_id") or "").startswith("emp_")
     for e in events or []:
-        who = {"doris": "Doris", "vendor": "Vendor", "system": "Call"}.get(e.get("who"), "Call")
-        add(e.get("who", "system"), who, e.get("text", ""), _clock(e["at"]))
+        who = {"doris": "Doris", "vendor": "Employee" if person else "Vendor", "system": "Call"}.get(e.get("who"), "Call")
+        text = e.get("text", "")
+        if e.get("who") == "system" and (text.startswith("CRS") or text.startswith("Not paid: CRS")):
+            who = "CRS"
+        elif e.get("who") == "system" and text.startswith(("Paid through Capital One", "Nothing sent:")):
+            who = "Payment"
+        add(e.get("who", "system"), who, text, _clock(e["at"]))
     for d in chain[1:]:
         cls = "t-bad" if d.get("decision") == "BLOCKED" else "t-good" if d.get("decision") == "PAY" else ""
         add(cls, "Result", f"{VERDICT.get(d.get('decision'), (d.get('decision'),))[0]}: {(d.get('reasons') or [''])[0]}", when(d.get("created_at"), "short"))
