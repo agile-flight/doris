@@ -2,6 +2,9 @@
 
 Every string from a Decision may have been written by an attacker (payee names, reasons, the hidden
 text Doris found), so all of it goes through esc() before it reaches the page.
+
+UI: Bootstrap 5 via CDN (no build step, no static directory). Secondary info lives inside Bootstrap
+collapses so judges see the verdict first and can drill down.
 """
 from __future__ import annotations
 
@@ -29,6 +32,9 @@ SIGNAL_LABEL = {
     "llm_judgment": "Claude's judgment", "new_vendor": "First-time vendor", "callback_result": "Callback result",
     "human_review": "Human review",
 }
+
+BOOTSTRAP_CSS = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">'
+BOOTSTRAP_JS = '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>'
 
 
 def esc(value: Any) -> str:
@@ -76,133 +82,466 @@ def pretty_phone(number: Optional[str]) -> str:
     return n
 
 
+VERIFY_METHODS = {
+    "called": "Called them on a number I found myself, not one from this email",
+    "record": "It matches a contract, PO or record we already had",
+    "attachment": "I opened the attachment myself and checked it against our records",
+    "in_person": "Verified in person",
+}
+YOUNG_DOMAIN_DAYS = 90
+
+
+def domain_age_days(d: dict) -> Optional[int]:
+    """Days between the sender domain's first certificate and when Doris checked the email, if known."""
+    checked = parse_ts(d.get("created_at"))
+    first = next((parse_ts(e.get("at")) for e in d.get("ct_timeline") or []
+                  if e.get("kind") == "cert_first_seen" and e.get("domain") == d.get("sender_domain")), None)
+    if not (checked and first):
+        return None
+    return max(0, (checked - first).days)
+
+
 # --- the page shell ---------------------------------------------------------------------
 
 CSS = """
-:root{--bg:#f7f6f3;--panel:#fff;--ink:#1d1d1b;--quiet:#5f5e5a;--line:#e3e1db;--pay:#1f7a4d;--pay-tint:#e5f4e4;
---hold:#9a6400;--hold-tint:#f9eeda;--callback:#1a5fb4;--callback-tint:#e7f1fb;--blocked:#b3261e;--blocked-tint:#fbebeb;
---mono:ui-monospace,SFMono-Regular,Menlo,monospace}
-@media (prefers-color-scheme:dark){:root{--bg:#161614;--panel:#20201d;--ink:#ecebe6;--quiet:#a3a19a;--line:#34332f;
---pay:#5cc48d;--pay-tint:#183324;--hold:#e3a73a;--hold-tint:#33280f;--callback:#78aef0;--callback-tint:#162a44;
---blocked:#f0786f;--blocked-tint:#3d1715}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:980px;margin:0 auto;padding:20px 16px 48px}a{color:var(--callback)}
-header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:18px}
-header.top .name{font-weight:700;font-size:20px}header.top .tag{color:var(--quiet)}
-header.top nav{margin-left:auto;display:flex;gap:14px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
-.banner{border-radius:10px;padding:18px 20px;margin-bottom:14px;border:1px solid transparent}
-.banner h1{margin:0 0 4px;font-size:28px}.banner p{margin:0}
-.v-pay{background:var(--pay-tint);color:var(--pay)}.v-hold{background:var(--hold-tint);color:var(--hold)}
-.v-callback{background:var(--callback-tint);color:var(--callback)}.v-blocked{background:var(--blocked-tint);color:var(--blocked)}
-.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px}
-.k{color:var(--quiet);font-size:12px;text-transform:uppercase;letter-spacing:.04em}.v{font-weight:600;overflow-wrap:anywhere}
-.changed{color:var(--blocked)}h2{font-size:15px;margin:0 0 10px}
-ol.reasons{margin:0;padding-left:20px}ol.reasons li{margin:3px 0}
-table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:6px 8px;border-top:1px solid var(--line);vertical-align:top}
-th{font-size:12px;color:var(--quiet);font-weight:600;border-top:0}tr.fired td:first-child{font-weight:600}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--line)}tr.fired .dot{background:var(--blocked)}
-.hidden-text{font-family:var(--mono);background:var(--blocked-tint);color:var(--blocked);padding:8px 10px;border-radius:6px;overflow-wrap:anywhere}
-.hash{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}.chain li{margin:6px 0}
-.ok{color:var(--pay);font-weight:600}.bad{color:var(--blocked);font-weight:600}.quiet{color:var(--quiet)}
-form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-button,input{font:inherit}button{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
-button.primary{background:var(--callback);border-color:var(--callback);color:#fff}button.danger{background:var(--blocked);border-color:var(--blocked);color:#fff}
-input[type=text]{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
-svg text{fill:var(--ink)}svg .q{fill:var(--quiet)}svg .ax{stroke:var(--line)}svg .bad{fill:var(--blocked)}svg .badline{stroke:var(--blocked)}
-svg .good{fill:var(--pay)}svg .mid{fill:var(--quiet)}svg .inv{stroke:var(--callback)}svg .invt{fill:var(--callback)}
-.scroll{overflow-x:auto}
-body.blocked-screen{background:#9f1f19;color:#fff}body.blocked-screen .panel{color:var(--ink)}body.blocked-screen header.top .tag,body.blocked-screen header.top a{color:#fff;opacity:.9}
-.blocked-hero{text-align:center;padding:48px 16px 28px}.blocked-hero h1{font-size:clamp(56px,12vw,120px);margin:0;letter-spacing:.04em}
-.blocked-hero p{font-size:20px;margin:8px auto 0;max-width:720px}
-.flash{padding:10px 14px;border-radius:8px;background:var(--hold-tint);color:var(--hold);margin-bottom:12px}
-ol.trace{list-style:none;margin:0;padding:0 0 0 18px;border-left:2px solid var(--line)}
-ol.trace li{position:relative;margin:0 0 10px;padding-left:10px;animation:rise .45s both;animation-delay:calc(var(--i,0) * 180ms)}
-ol.trace li::before{content:"";position:absolute;left:-25px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--line)}
-ol.trace li.doris::before{background:var(--callback)}ol.trace li.vendor::before{background:var(--hold)}
-ol.trace li.t-bad::before{background:var(--blocked)}ol.trace li.t-good::before{background:var(--pay)}
-ol.trace li.live::before{box-shadow:0 0 0 0 var(--callback);animation:pulse 1.4s infinite}
-ol.trace .who{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--quiet);margin-right:6px}
-ol.trace .t{font-size:12px;color:var(--quiet);margin-left:6px}ol.trace li.vendor .say{font-style:italic}
-@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(26,95,180,.6)}70%{box-shadow:0 0 0 10px rgba(26,95,180,0)}100%{box-shadow:0 0 0 0 rgba(26,95,180,0)}}
-@media (prefers-reduced-motion:reduce){ol.trace li,ol.trace li.live::before{animation:none}}
-@media print{body,body.blocked-screen{background:#fff;color:#000}.noprint,header.top nav{display:none}.panel{border-color:#999;break-inside:avoid}}
+:root {
+  --doris-bg: #f8f9fa;
+  --doris-panel: #ffffff;
+  --doris-ink: #1f2328;
+  --doris-quiet: #656d76;
+  --doris-line: #dee2e6;
+  --doris-pay: #198754;
+  --doris-pay-tint: #d1e7dd;
+  --doris-hold: #b06500;
+  --doris-hold-tint: #fff3cd;
+  --doris-callback: #0d6efd;
+  --doris-callback-tint: #cff4fc;
+  --doris-blocked: #dc3545;
+  --doris-blocked-tint: #f8d7da;
+  --doris-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --doris-bg: #0d1117;
+    --doris-panel: #161b22;
+    --doris-ink: #f0f6fc;
+    --doris-quiet: #8b949e;
+    --doris-line: #30363d;
+    --doris-pay: #3fb950;
+    --doris-pay-tint: #0d2818;
+    --doris-hold: #d29922;
+    --doris-hold-tint: #2d2206;
+    --doris-callback: #58a6ff;
+    --doris-callback-tint: #0c2d6b;
+    --doris-blocked: #f85149;
+    --doris-blocked-tint: #3b1219;
+  }
+  body {
+    background-color: var(--doris-bg) !important;
+    color: var(--doris-ink) !important;
+  }
+  .card {
+    background-color: var(--doris-panel) !important;
+    border-color: var(--doris-line) !important;
+    color: var(--doris-ink) !important;
+  }
+  .table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--doris-ink);
+    --bs-table-border-color: var(--doris-line);
+  }
+  .table-light {
+    --bs-table-bg: rgba(255, 255, 255, 0.05) !important;
+    --bs-table-color: var(--doris-ink) !important;
+  }
+  .table-hover tbody tr:hover {
+    color: var(--doris-ink) !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+  }
+  .navbar {
+    background-color: var(--doris-panel) !important;
+    border-color: var(--doris-line) !important;
+  }
+  .navbar-brand {
+    color: var(--doris-ink) !important;
+  }
+  .form-control, .form-select {
+    background-color: #0d1117 !important;
+    border-color: var(--doris-line) !important;
+    color: var(--doris-ink) !important;
+  }
+  .form-control:focus, .form-select:focus {
+    background-color: #0d1117 !important;
+    color: var(--doris-ink) !important;
+    border-color: #58a6ff !important;
+  }
+  .form-control::placeholder {
+    color: var(--doris-quiet) !important;
+  }
+  .text-muted {
+    color: var(--doris-quiet) !important;
+  }
+  .bg-light {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: var(--doris-ink) !important;
+  }
+  .border {
+    border-color: var(--doris-line) !important;
+  }
+  .list-group-item {
+    background-color: var(--doris-panel) !important;
+    border-color: var(--doris-line) !important;
+    color: var(--doris-ink) !important;
+  }
+  .stat-card {
+    background-color: var(--doris-panel) !important;
+    border-color: var(--doris-line) !important;
+  }
+  .key-stat {
+    color: var(--doris-ink) !important;
+  }
+  svg text { fill: var(--doris-ink); }
+  svg .q { fill: var(--doris-quiet); }
+  svg .ax { stroke: var(--doris-line); }
+}
+
+body {
+  background: var(--doris-bg);
+  color: var(--doris-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+.verdict-hero {
+  border-radius: 1rem;
+  padding: 2.25rem 2rem;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+.verdict-hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  margin: 0;
+  letter-spacing: .02em;
+}
+.verdict-hero .verdict-badge {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.verdict-hero p.sub {
+  font-size: 1.2rem;
+  margin: .4rem 0 0;
+  opacity: .95;
+}
+
+.v-pay { background: linear-gradient(135deg, #198754, #146c43); }
+.v-hold { background: linear-gradient(135deg, #b06500, #804800); }
+.v-callback { background: linear-gradient(135deg, #0d6efd, #084298); }
+.v-blocked { background: linear-gradient(135deg, #dc3545, #842029); }
+
+.stat-card {
+  border: 1px solid var(--doris-line);
+  border-radius: .75rem;
+  background: var(--doris-panel);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.key-stat {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--doris-ink);
+  line-height: 1.25;
+}
+.key-label {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--doris-quiet);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.btn-verdict {
+  min-width: 140px;
+  padding: .65rem 1.4rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: .5rem;
+}
+
+.navbar {
+  background: var(--doris-panel);
+}
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--doris-ink);
+}
+
+.hash {
+  font-family: var(--doris-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+svg text { fill: var(--doris-ink); }
+svg .q { fill: var(--doris-quiet); }
+svg .ax { stroke: var(--doris-line); }
+svg .bad { fill: var(--doris-blocked); }
+svg .badline { stroke: var(--doris-blocked); }
+svg .good { fill: var(--doris-pay); }
+svg .mid { fill: var(--doris-quiet); }
+svg .inv { stroke: var(--doris-callback); }
+svg .invt { fill: var(--doris-callback); }
+
+body.blocked-screen {
+  background: #751410 !important;
+  color: #fff !important;
+}
+body.blocked-screen .navbar {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+body.blocked-screen .navbar-brand, body.blocked-screen .navbar a {
+  color: #fff !important;
+}
+body.blocked-screen .btn-outline-secondary {
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+body.blocked-screen .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+body.blocked-screen .card {
+  background: var(--doris-panel);
+  color: var(--doris-ink);
+}
+
+ol.trace {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  border-left: 2px solid var(--doris-line);
+}
+ol.trace li {
+  position: relative;
+  margin: 0 0 0.75rem;
+  padding-left: 0.75rem;
+  animation: rise .45s both;
+  animation-delay: calc(var(--i, 0) * 180ms);
+}
+ol.trace li::before {
+  content: "";
+  position: absolute;
+  left: -1.65rem;
+  top: 0.35rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--doris-line);
+}
+ol.trace li.doris::before { background: var(--doris-callback); }
+ol.trace li.vendor::before { background: var(--doris-hold); }
+ol.trace li.t-bad::before { background: var(--doris-blocked); }
+ol.trace li.t-good::before { background: var(--doris-pay); }
+ol.trace li.live::before {
+  box-shadow: 0 0 0 0 var(--doris-callback);
+  animation: pulse 1.4s infinite;
+}
+ol.trace .who {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--doris-quiet);
+  margin-right: 0.4rem;
+}
+ol.trace .t {
+  font-size: 0.75rem;
+  color: var(--doris-quiet);
+  margin-left: 0.4rem;
+}
+ol.trace li.vendor .say { font-style: italic; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, .6); } 70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); } 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); } }
+@media (prefers-reduced-motion: reduce) { ol.trace li, ol.trace li.live::before { animation: none; } }
+@media print {
+  body, body.blocked-screen { background: #fff !important; color: #000 !important; }
+  .noprint, nav { display: none !important; }
+  .card, .panel { border-color: #999 !important; break-inside: avoid; }
+}
 """
 
 POLL_JS = """
 <script>
-(function(){var el=document.body;var url=el.getAttribute('data-poll');if(!url)return;var me=el.getAttribute('data-id');
-function tick(){fetch(url,{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
-if(s.latest_id&&s.latest_id!==me){location.href='/d/'+encodeURIComponent(s.latest_id);return}
-var c=document.getElementById('call-status');if(c&&s.call_text!==undefined)c.textContent=s.call_text;
-var ol=document.getElementById('trace');if(ol&&s.trace_count!==undefined&&s.trace_count!==ol.children.length){
-fetch('/d/'+encodeURIComponent(me)+'/trace',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){
-var t=document.createElement('template');t.innerHTML=h;var items=t.content.querySelectorAll('li');
-for(var i=0;i<ol.children.length;i++){ol.children[i].classList.remove('live')}
-for(var j=ol.children.length;j<items.length;j++){var li=items[j].cloneNode(true);li.style.setProperty('--i','0');ol.appendChild(li)}
-if(items.length&&items[items.length-1].classList.contains('live')&&ol.lastElementChild){ol.lastElementChild.classList.add('live')}})}
-}).catch(function(){})}
-window.addEventListener('doris:changed',tick);
-(function loop(){setTimeout(function(){tick();loop()},window.__dorisDeskLive?8000:1500)})();})();
+(function(){
+  var el = document.body;
+  var url = el.getAttribute('data-poll');
+  if(!url) return;
+  var me = el.getAttribute('data-id');
+  function tick(){
+    fetch(url, {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(s){
+      if(s.latest_id && s.latest_id !== me){
+        location.href = '/d/' + encodeURIComponent(s.latest_id);
+        return;
+      }
+      var c = document.getElementById('call-status');
+      if(c && s.call_text !== undefined) c.textContent = s.call_text;
+      var pill = document.getElementById('live-pill');
+      if(pill && s.decision) pill.textContent = s.decision;
+      var ol = document.getElementById('trace');
+      if(ol && s.trace_count !== undefined && s.trace_count !== ol.children.length){
+        fetch('/d/' + encodeURIComponent(me) + '/trace', {cache: 'no-store'}).then(function(r){ return r.text(); }).then(function(h){
+          var t = document.createElement('template');
+          t.innerHTML = h;
+          var items = t.content.querySelectorAll('li');
+          for(var i = 0; i < ol.children.length; i++){ ol.children[i].classList.remove('live'); }
+          for(var j = ol.children.length; j < items.length; j++){
+            var li = items[j].cloneNode(true);
+            li.style.setProperty('--i', '0');
+            ol.appendChild(li);
+          }
+          if(items.length && items[items.length - 1].classList.contains('live') && ol.lastElementChild){
+            ol.lastElementChild.classList.add('live');
+          }
+        });
+      }
+    }).catch(function(){});
+  }
+  window.addEventListener('doris:changed', tick);
+  (function loop(){
+    setTimeout(function(){ tick(); loop(); }, window.__dorisDeskLive ? 8000 : 1500);
+  })();
+})();
 </script>"""
 
 
 def page(title: str, body: str, *, body_class: str = "", poll: Optional[str] = None, decision_id: Optional[str] = None,
          chain_ids: Optional[list[str]] = None) -> str:
-    attrs = f' class="{esc(body_class)}"' if body_class else ""
-    if poll:
-        attrs += f' data-poll="{esc(poll)}" data-id="{esc(decision_id)}"'
-    if chain_ids:
-        attrs += f' data-chain="{esc(",".join(chain_ids))}"'
+    poll_attr = f' data-poll="{esc(poll)}"' if poll else ""
+    id_attr = f' data-id="{esc(decision_id)}"' if decision_id is not None else ""
+    chain_attr = f' data-chain="{esc(",".join(chain_ids))}"' if chain_ids else ""
     desk_head = desk_tail = ""
     if DESK_CONFIG and poll:
         desk_head = f'<meta name="doris-desk" content="{esc(json.dumps(DESK_CONFIG))}">'
         desk_tail = '<script type="module" src="/static/desk.js"></script>'
+    verdict_badge = ""
+    if poll:
+        verdict_badge = '<span id="live-pill" class="badge bg-secondary">Live</span>'
     return (
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-        f"{desk_head}<title>{esc(title)}</title><style>{CSS}</style></head><body{attrs}><main>"
-        "<header class=\"top\"><span class=\"name\">Doris</span>"
-        f"<span class=\"tag\">{esc(TAGLINE)}</span><nav><span id=\"desk-status\" class=\"quiet\"></span>"
-        "<a href=\"/\">Queue</a><a href=\"/samples\">Samples</a></nav></header>"
-        f"{body}</main>{POLL_JS if poll else ''}{desk_tail}</body></html>"
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'{desk_head}'
+        f'<title>{esc(title)} — Doris</title>'
+        f'{BOOTSTRAP_CSS}'
+        f'<style>{CSS}</style>'
+        f'</head><body class="py-4 {esc(body_class)}"{poll_attr}{id_attr}{chain_attr}>'
+        '<div class="container" style="max-width:980px">'
+        '<nav class="navbar navbar-expand rounded px-3 py-2 mb-4 border shadow-sm">'
+        '<div class="container-fluid px-0">'
+        '<a class="navbar-brand d-flex align-items-center gap-2" href="/">'
+        '<span class="fs-4 fw-bold">Doris</span>'
+        f'<span class="badge bg-secondary text-light fw-normal fs-6 d-none d-sm-inline">{esc(TAGLINE)}</span>'
+        '</a>'
+        '<div class="d-flex align-items-center gap-2">'
+        '<span id="desk-status" class="text-muted small"></span>'
+        f'{verdict_badge}'
+        '<a class="btn btn-outline-secondary btn-sm" href="/">Queue</a>'
+        '<a class="btn btn-outline-secondary btn-sm" href="/samples">Samples</a>'
+        '</div></div></nav>'
+        f'<main>{body}</main>'
+        f'</div>{BOOTSTRAP_JS}{POLL_JS if poll else ""}{desk_tail}</body></html>'
     )
 
 
-# --- pieces ---------------------------------------------------------------------------
+def safe(fn, *args, **kwargs) -> str:
+    """Render one panel; if its data is too strange to draw, say so instead of failing the whole screen."""
+    try:
+        out = fn(*args, **kwargs)
+        return "" if out is None else str(out)
+    except Exception:
+        import logging
+        logging.getLogger("doris.render").exception("panel %s failed", getattr(fn, "__name__", fn))
+        return '<div class="alert alert-warning mb-4">This panel could not be drawn from this decision.</div>'
+
 
 def pill(decision: str) -> str:
-    label, cls, _ = VERDICT.get(decision, (decision, "hold", ""))
-    return f'<span class="pill v-{cls}">{esc(label)}</span>'
+    v = (decision or "").upper()
+    mapping = {
+        "PAY": ("success", "Paid"),
+        "HOLD": ("warning text-dark", "On hold"),
+        "CALLBACK": ("info text-dark", "Calling to verify"),
+        "BLOCKED": ("danger", "Blocked"),
+    }
+    color, label = mapping.get(v, ("secondary", decision or "—"))
+    return f'<span class="badge bg-{color}">{esc(label)}</span>'
 
 
 def summary(d: dict) -> str:
-    changed = d.get("bank_account_new") and d.get("bank_account_new") != d.get("bank_account_on_file")
-    rows = [
-        ("Claims to be", d.get("vendor_claimed") or "Unknown"),
-        ("Record on file", d.get("vendor_id") or "None: nothing on file for this sender"),
-        ("Pay to", d.get("payee_name") or "Not found"),
-        ("Amount", None),
-        ("Sender", d.get("sender_email") or d.get("sender_domain") or "Unknown"),
-        ("Account on file", d.get("bank_account_on_file") or "None"),
-        ("Account requested", d.get("bank_account_new") or "Same as on file"),
-        ("Invoice", d.get("invoice_id")),
-    ]
-    cells = []
-    for k, v in rows:
-        value = money(d.get("amount"), d.get("currency")) if k == "Amount" else esc(v)
-        cls = " changed" if (k == "Account requested" and changed) else ""
-        cells.append(f'<div><div class="k">{esc(k)}</div><div class="v{cls}">{value}</div></div>')
-    return f'<section class="panel"><div class="grid">{"".join(cells)}</div></section>'
+    changed = bool(d.get("bank_account_new") and d.get("bank_account_on_file") and d.get("bank_account_new") != d.get("bank_account_on_file"))
+    amount_str = money(d.get("amount"), d.get("currency"))
+    invoice_id = d.get("invoice_id") or "—"
+    payee_name = d.get("payee_name") or "Not found"
+    vendor_claimed = d.get("vendor_claimed") or "—"
+    vendor_id = d.get("vendor_id") or "None: nothing on file for this sender"
+    sender = d.get("sender_email") or d.get("sender_domain") or "Unknown"
+    acct_file = d.get("bank_account_on_file") or "None"
+    acct_new = d.get("bank_account_new") or "Same as on file"
+
+    alert_bank = ""
+    if changed:
+        alert_bank = (
+            f'<div class="col-12">'
+            f'<div class="alert alert-danger d-flex align-items-center mb-0 py-2 px-3 border-danger shadow-sm">'
+            f'<div><strong>⚠️ Bank Account Changed:</strong> Requests payment to <code class="fw-bold">{esc(acct_new)}</code>, '
+            f'but record on file is <code class="fw-bold">{esc(acct_file)}</code>.</div>'
+            f'</div></div>'
+        )
+
+    return (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-3">Transaction Summary</h5>'
+        f'<div class="row g-3 mb-3">'
+        f'<div class="col-md-3 col-sm-6"><div class="stat-card p-3 rounded border"><div class="key-label text-muted">Amount</div><div class="key-stat">{amount_str}</div></div></div>'
+        f'<div class="col-md-3 col-sm-6"><div class="stat-card p-3 rounded border"><div class="key-label text-muted">Invoice</div><div class="key-stat">{esc(invoice_id)}</div></div></div>'
+        f'<div class="col-md-3 col-sm-6"><div class="stat-card p-3 rounded border"><div class="key-label text-muted">Payee</div><div class="key-stat">{esc(payee_name)}</div></div></div>'
+        f'<div class="col-md-3 col-sm-6"><div class="stat-card p-3 rounded border"><div class="key-label text-muted">Vendor Claimed</div><div class="key-stat">{esc(vendor_claimed)}</div></div></div>'
+        f'</div>'
+        f'<div class="row g-3">'
+        f'{alert_bank}'
+        f'<div class="col-md-6"><div class="p-3 rounded border bg-light">'
+        f'<div class="fw-semibold mb-2">Banking Details</div>'
+        f'<div class="d-flex justify-content-between mb-1"><span class="text-muted small">Account on file:</span><span class="font-monospace small fw-bold">{esc(acct_file)}</span></div>'
+        f'<div class="d-flex justify-content-between mb-0"><span class="text-muted small">Account requested:</span><span class="font-monospace small fw-bold {"text-danger" if changed else ""}">{esc(acct_new)}</span></div>'
+        f'</div></div>'
+        f'<div class="col-md-6"><div class="p-3 rounded border bg-light">'
+        f'<div class="fw-semibold mb-2">Vendor Identity</div>'
+        f'<div class="d-flex justify-content-between mb-1"><span class="text-muted small">Sender:</span><span class="small fw-semibold">{esc(sender)}</span></div>'
+        f'<div class="d-flex justify-content-between mb-0"><span class="text-muted small">Record on file:</span><span class="small fw-semibold">{esc(vendor_id)}</span></div>'
+        f'</div></div>'
+        f'</div>'
+        f'</div></div>'
+    )
 
 
 def reasons(d: dict) -> str:
-    items = "".join(f"<li>{esc(r)}</li>" for r in d.get("reasons") or [])
+    rs = d.get("reasons") or []
+    items = "".join(f'<li class="mb-2">{esc(r)}</li>' for r in rs)
     rationale = d.get("llm_rationale")
-    extra = f'<p class="quiet" style="margin:10px 0 0">Claude: {esc(rationale)}</p>' if rationale else ""
-    return f'<section class="panel"><h2>Why</h2><ol class="reasons">{items or "<li>No reasons given</li>"}</ol>{extra}</section>'
+    extra = (
+        f'<div class="mt-3 p-3 rounded bg-light border">'
+        f'<div class="fw-semibold text-primary mb-1">Claude\'s Analysis</div>'
+        f'<div class="small">{esc(rationale)}</div>'
+        f'</div>'
+    ) if rationale else ""
+    return (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-3">Why Doris Flagged This</h5>'
+        f'<ol class="mb-0 ps-3">{items or "<li>No reasons given</li>"}</ol>'
+        f'{extra}'
+        f'</div></div>'
+    )
 
 
 def hidden_text(d: dict) -> str:
@@ -211,38 +550,21 @@ def hidden_text(d: dict) -> str:
         return ""
     findings = (sig.get("evidence") or {}).get("findings") or []
     quotes = "".join(
-        f'<p class="hidden-text">{esc(f.get("text"))}</p><p class="quiet" style="margin:2px 0 10px">'
-        f'{esc(str(f.get("kind", "")).replace("_", " "))}{", line " + esc(f.get("line")) if f.get("line") else ""} ({esc(f.get("source"))})</p>'
+        f'<div class="p-3 mb-2 rounded bg-danger-subtle text-danger border border-danger-subtle font-monospace small">'
+        f'<div class="fw-bold mb-1">Prompt Injection Payload:</div>'
+        f'<div class="p-2 bg-white rounded border border-danger-subtle text-dark overflow-auto">{esc(f.get("text"))}</div>'
+        f'<div class="text-muted small mt-1">{esc(str(f.get("kind", "")).replace("_", " "))}'
+        f'{", line " + esc(f.get("line")) if f.get("line") else ""} ({esc(f.get("source"))})</div>'
+        f'</div>'
         for f in findings[:3] if f.get("text"))
-    return (f'<section class="panel"><h2>Hidden text Doris found</h2><p class="quiet" style="margin-top:0">'
-            f'A real vendor has no reason to hide instructions. Their prompt injection became our evidence.</p>{quotes}</section>')
+    return (
+        f'<div class="card border-danger border-2 shadow-sm mb-4"><div class="card-body">'
+        f'<h5 class="card-title text-danger fw-bold mb-1">Hidden text Doris found</h5>'
+        f'<p class="text-muted small mb-3">A real vendor has no reason to hide instructions. Their prompt injection became our evidence.</p>'
+        f'{quotes}'
+        f'</div></div>'
+    )
 
-
-def signals_table(d: dict) -> str:
-    rows = []
-    for s in d.get("signals") or []:
-        cls = ' class="fired"' if s.get("fired") else ""
-        label = SIGNAL_LABEL.get(s.get("name"), s.get("name"))
-        rows.append(f"<tr{cls}><td><span class=\"dot\"></span>{esc(label)}</td><td>{'Fired' if s.get('fired') else 'Quiet'}</td>"
-                    f"<td>{esc(s.get('weight'))}</td><td>{esc(s.get('detail'))}</td></tr>")
-    return ('<section class="panel"><h2>Every check that ran</h2><div class="scroll"><table><tr><th>Check</th><th>Result</th>'
-            f'<th>Weight</th><th>Detail</th></tr>{"".join(rows)}</table></div></section>')
-
-
-def audit_trail(chain: list[dict], audit_ok: Optional[bool]) -> str:
-    status = ('<span class="ok">Chain verified</span>' if audit_ok else
-              '<span class="bad">Chain verification failed</span>' if audit_ok is False else
-              '<span class="quiet">Chain not checked</span>')
-    items = []
-    for d in chain:
-        items.append(
-            f"<li>{pill(d.get('decision', ''))} <span class=\"quiet\">#{esc(d.get('seq'))} · {esc(when(d.get('created_at')))} · "
-            f"{esc(d.get('decision_id'))}</span><div class=\"hash\">prev {esc(d.get('prev_hash'))}<br>hash {esc(d.get('audit_hash'))}</div></li>")
-    return (f'<section class="panel"><h2>Audit trail</h2><p style="margin-top:0">{status}. Each record\'s hash covers the one before it, '
-            f'so nobody can quietly rewrite this history.</p><ol class="chain">{"".join(items)}</ol></section>')
-
-
-# --- the Certificate Transparency strip ------------------------------------------------
 
 def ct_strip(d: dict) -> str:
     """One strip, readable in three seconds: when each domain got its first certificate, against
@@ -329,74 +651,166 @@ def ct_strip(d: dict) -> str:
         caption.append(f"{esc(dom)} got its first certificate {days} days before this invoice" if dom in young
                        else f"{esc(dom)} has had certificates since {esc(when(t.isoformat(), 'month'))}")
     text = "; ".join(caption) + "." if caption else ""
-    return (f'<section class="panel"><h2>Certificate Transparency</h2>{"".join(parts)}'
-            f'<p class="quiet" style="margin:6px 0 0">{text}</p></section>')
+    return (f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+            f'<h5 class="card-title fw-bold mb-3">Certificate Transparency Timeline</h5>'
+            f'<div class="overflow-auto">{"".join(parts)}</div>'
+            f'<p class="text-muted small mt-3 mb-0">{text}</p></div></div>')
 
 
-# --- whole screens -------------------------------------------------------------------
+def signals_table(d: dict) -> str:
+    signals = d.get("signals") or []
+    if not signals:
+        return ""
+    fired_count = sum(1 for s in signals if s.get("fired"))
+    rows = []
+    for s in signals:
+        fired = bool(s.get("fired"))
+        cls = ' class="table-danger"' if fired else ""
+        badge = '<span class="badge bg-danger">Fired</span>' if fired else '<span class="badge bg-secondary">Quiet</span>'
+        label = SIGNAL_LABEL.get(s.get("name"), s.get("name"))
+        rows.append(
+            f'<tr{cls}>'
+            f'<td class="fw-semibold">{esc(label)}</td>'
+            f'<td class="text-center">{badge}</td>'
+            f'<td><span class="badge bg-light text-dark border">{esc(s.get("weight") or "")}</span></td>'
+            f'<td class="small text-muted">{esc(s.get("detail") or "")}</td>'
+            f'</tr>'
+        )
+    return (
+        f'<div class="card border-0 shadow-sm mb-4">'
+        f'<div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3" '
+        f'data-bs-toggle="collapse" data-bs-target="#collapseSignals" style="cursor:pointer">'
+        f'<div class="d-flex align-items-center gap-2">'
+        f'<h5 class="card-title fw-bold mb-0">Every Check That Ran</h5>'
+        f'<span class="badge bg-{"danger" if fired_count else "success"}">{fired_count} fired</span>'
+        f'<span class="badge bg-secondary">{len(signals)} total</span>'
+        f'</div>'
+        f'<span class="btn btn-sm btn-outline-secondary">Toggle</span>'
+        f'</div>'
+        f'<div class="collapse show" id="collapseSignals">'
+        f'<div class="card-body p-0">'
+        f'<div class="table-responsive">'
+        f'<table class="table table-hover align-middle mb-0">'
+        f'<thead class="table-light"><tr><th>Check</th><th class="text-center" style="width:100px">Result</th><th style="width:110px">Weight</th><th>Detail</th></tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody>'
+        f'</table>'
+        f'</div></div></div></div>'
+    )
 
-def callback_panel(d: dict, call_text: str, can_call: bool) -> str:
+
+def audit_trail(chain: list[dict], audit_ok: Optional[bool] = None) -> str:
+    status_badge = (
+        '<span class="badge bg-success">Chain verified</span>' if audit_ok else
+        '<span class="badge bg-danger">Chain verification failed</span>' if audit_ok is False else
+        '<span class="badge bg-secondary">Chain not checked</span>'
+    )
+    items = []
+    for d in chain:
+        items.append(
+            f'<li class="mb-3 p-3 bg-light rounded border">'
+            f'<div class="d-flex justify-content-between align-items-center mb-1">'
+            f'{pill(d.get("decision", ""))}'
+            f'<span class="text-muted small">#{esc(d.get("seq") or "")} · {esc(when(d.get("created_at")))} · {esc(d.get("decision_id"))}</span>'
+            f'</div>'
+            f'<div class="hash">'
+            f'prev {esc(d.get("prev_hash") or "")}<br>'
+            f'hash {esc(d.get("audit_hash") or "")}'
+            f'</div>'
+            f'</li>'
+        )
+    return (
+        f'<div class="card border-0 shadow-sm mb-4">'
+        f'<div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3" '
+        f'data-bs-toggle="collapse" data-bs-target="#collapseAudit" style="cursor:pointer">'
+        f'<div class="d-flex align-items-center gap-2">'
+        f'<h5 class="card-title fw-bold mb-0">Audit trail</h5>'
+        f'{status_badge}'
+        f'</div>'
+        f'<span class="btn btn-sm btn-outline-secondary">Toggle</span>'
+        f'</div>'
+        f'<div class="collapse show" id="collapseAudit">'
+        f'<div class="card-body">'
+        f'<p class="text-muted small mb-3">Each record\'s hash covers the one before it, so nobody can quietly rewrite this history.</p>'
+        f'<ol class="list-unstyled mb-0">{"".join(items)}</ol>'
+        f'</div></div></div>'
+    )
+
+
+def callback_panel(d: dict, call_text: str = "", can_call: bool = False) -> str:
+    phone = d.get("callback_number") or d.get("callback_phone") or d.get("phone_on_file") or ""
+    ok = d.get("callback_ok")
+    verdict = d.get("decision", "")
     since = when(d.get("callback_number_on_file_since"), "month")
-    button = ('<form class="inline" method="post" action="/d/{0}/call"><button class="primary">Call the vendor now</button></form>'
-              .format(esc(d.get("decision_id")))) if can_call else ""
-    manual = ('<form class="inline" method="post" action="/d/{0}/manual_callback"><span class="quiet">Called them yourself?</span>'
-              '<input type="text" name="notes" placeholder="What they said" aria-label="What the vendor said">'
-              '<button name="confirmed" value="no" class="danger">They never changed banks</button>'
-              '<button name="confirmed" value="yes">They confirmed the change</button></form>').format(esc(d.get("decision_id")))
-    return (f'<section class="panel"><h2>Callback</h2><p style="margin-top:0">Number on file: <strong>{esc(pretty_phone(d.get("callback_number")))}</strong>'
+    if phone and verdict != "BLOCKED":
+        status = "Confirmed" if ok is True else ("Pending" if ok is None else "Failed")
+        badge = {"Confirmed": "bg-success", "Pending": "bg-warning text-dark", "Failed": "bg-danger"}.get(status, "bg-secondary")
+        button = (
+            f'<form class="d-inline" method="post" action="/d/{esc(d.get("decision_id"))}/call">'
+            f'<button class="btn btn-primary btn-verdict">Call the vendor now</button>'
+            f'</form>'
+        ) if can_call else ""
+        manual = (
+            f'<form class="d-inline mt-2 mt-md-0" method="post" action="/d/{esc(d.get("decision_id"))}/manual_callback">'
+            f'<span class="text-muted small me-2">Called them yourself?</span>'
+            f'<input type="text" name="notes" placeholder="What they said" aria-label="What the vendor said" class="form-control form-control-sm d-inline w-auto me-2" style="width:200px">'
+            f'<button name="confirmed" value="no" class="btn btn-outline-danger btn-sm me-2">They never changed banks</button>'
+            f'<button name="confirmed" value="yes" class="btn btn-outline-success btn-sm">They confirmed the change</button>'
+            f'</form>'
+        )
+        return (
+            f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+            f'<div class="d-flex justify-content-between align-items-center mb-2">'
+            f'<h5 class="card-title fw-bold mb-0">Vendor Callback</h5>'
+            f'<span class="badge {badge}">Status: {esc(status)}</span>'
+            f'</div>'
+            f'<p class="mb-2">Number on file: <strong>{esc(pretty_phone(phone))}</strong>'
             f'{", on file since " + esc(since) if since else ""}. Never a number from the email.</p>'
-            f'<p id="call-status" class="quiet">{esc(call_text)}</p>{button}{manual}</section>')
-
-
-VERIFY_METHODS = {
-    "called": "Called them on a number I found myself, not one from this email",
-    "record": "It matches a contract, PO or record we already had",
-    "attachment": "I opened the attachment myself and checked it against our records",
-    "in_person": "Verified in person",
-}
-YOUNG_DOMAIN_DAYS = 90
-
-
-def domain_age_days(d: dict) -> Optional[int]:
-    """Days between the sender domain's first certificate and when Doris checked the email, if known."""
-    checked = parse_ts(d.get("created_at"))
-    first = next((parse_ts(e.get("at")) for e in d.get("ct_timeline") or []
-                  if e.get("kind") == "cert_first_seen" and e.get("domain") == d.get("sender_domain")), None)
-    if not (checked and first):
-        return None
-    return max(0, (checked - first).days)
+            f'<p id="call-status" class="text-muted small mb-3">{esc(call_text)}</p>'
+            f'<div class="d-flex flex-wrap gap-2 align-items-center">{button}{manual}</div>'
+            f'</div></div>'
+        )
+    return ""
 
 
 def review_panel(d: dict) -> str:
-    """Approving a held payment is a control, not a click: the reviewer says how they verified it, and from what."""
+    """Human review form: the reviewer says how they verified it, and from what."""
     new_vendor = any(s.get("name") == "new_vendor" and s.get("fired") for s in d.get("signals") or [])
     age = domain_age_days(d)
     lead = ("First-time vendor: Doris has nothing on file to check this against, and documents can be forged. "
             "Before approving, confirm it yourself using contact details you found independently." if new_vendor else
             "Before approving, confirm the payment details yourself through a channel you already trusted.")
-    untrusted = (f'<p class="quiet">From this email, so untrusted: {esc(d.get("sender_email") or d.get("sender_domain") or "the sender")}'
-                 " and any phone number, link or address in it.</p>")
+    untrusted = (f'<p class="text-muted small mb-2">From this email, so untrusted: {esc(d.get("sender_email") or d.get("sender_domain") or "the sender")} '
+                 "and any phone number, link or address in it.</p>")
     evidence = ""
     young = ""
     if age is not None:
         span = f"{age // 365} years" if age >= 730 else f"{age} days"
-        evidence = f'<p>{esc(d.get("sender_domain"))} got its first certificate {span} before this email.</p>'
+        evidence = f'<p class="small text-muted mb-2">{esc(d.get("sender_domain"))} got its first certificate {span} before this email.</p>'
         if age < YOUNG_DOMAIN_DAYS:
-            young = (f'<label style="display:block;margin-top:6px"><input type="checkbox" name="young_ok" value="yes"> '
-                     f'I know {esc(d.get("sender_domain"))} is only {age} days old</label>')
+            young = (f'<div class="form-check my-3">'
+                     f'<input class="form-check-input" type="checkbox" name="young_ok" value="yes" id="young_ok">'
+                     f'<label class="form-check-label fw-semibold" for="young_ok">I know {esc(d.get("sender_domain"))} is only {age} days old</label>'
+                     f'</div>')
     options = "".join(f'<option value="{esc(k)}">{esc(v)}</option>' for k, v in VERIFY_METHODS.items())
-    return ('<section class="panel"><h2>Human review</h2>'
-            f'<p style="margin-top:0">{esc(lead)}</p>{untrusted}{evidence}'
-            f'<form method="post" action="/d/{esc(d.get("decision_id"))}/review">'
-            '<div class="inline" style="display:flex;gap:8px;flex-wrap:wrap">'
-            '<input type="text" name="reviewer" placeholder="Your name" aria-label="Reviewer" required>'
-            f'<select name="method" aria-label="How you verified it"><option value="">How did you verify it?</option>{options}</select>'
-            '<input type="text" name="source" placeholder="Where that number or record came from" aria-label="Source" style="min-width:260px">'
-            '<input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes"></div>'
-            f'{young}<div class="inline" style="display:flex;gap:8px;margin-top:8px">'
-            '<button name="approve" value="yes">Approve payment</button><button name="approve" value="no" class="danger">Reject</button>'
-            '</div><p class="quiet" style="margin:6px 0 0">Approving needs how you verified it and where from. Rejecting needs only your name.</p>'
-            '</form></section>')
+    return (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-2">Human Review</h5>'
+        f'<p class="mb-2">{esc(lead)}</p>{untrusted}{evidence}'
+        f'<form method="post" action="/d/{esc(d.get("decision_id"))}/review">'
+        f'<div class="row g-2 mb-3">'
+        f'<div class="col-md-4"><input type="text" name="reviewer" placeholder="Your name" class="form-control" aria-label="Reviewer" required></div>'
+        f'<div class="col-md-4"><select name="method" class="form-select" aria-label="How you verified it"><option value="">How did you verify it?</option>{options}</select></div>'
+        f'<div class="col-md-4"><input type="text" name="source" placeholder="Where that number or record came from" class="form-control" aria-label="Source"></div>'
+        f'<div class="col-12"><input type="text" name="notes" placeholder="Notes (optional)" class="form-control" aria-label="Notes"></div>'
+        f'</div>'
+        f'{young}'
+        f'<div class="d-flex gap-2 align-items-center">'
+        f'<button name="approve" value="yes" class="btn btn-success btn-verdict">Approve payment</button>'
+        f'<button name="approve" value="no" class="btn btn-outline-danger btn-verdict">Reject</button>'
+        f'</div>'
+        f'<p class="text-muted small mt-2 mb-0">Approving needs how you verified it and where from. Rejecting needs only your name.</p>'
+        f'</form></div></div>'
+    )
 
 
 def _clock(ts: float) -> str:
@@ -445,35 +859,58 @@ def trace_items(chain: list[dict], events: Optional[list[dict]] = None, live: bo
 
 
 def trace_panel(chain: list[dict], events: Optional[list[dict]] = None, live: bool = False) -> str:
-    return (f'<section class="panel"><h2>What Doris did</h2><ol class="trace" id="trace">{trace_items(chain, events, live)}</ol>'
-            '</section>')
+    return (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-3">What Doris did</h5>'
+        f'<ol class="trace" id="trace">{trace_items(chain, events, live)}</ol>'
+        f'</div></div>'
+    )
 
 
 def audit_links(d: dict) -> str:
     i = esc(d.get("decision_id"))
-    return (f'<p class="noprint" style="margin:8px 0 0"><a href="/d/{i}/audit">Open the audit record</a> · '
-            f'<a href="/d/{i}/audit.json">Download the audit packet (JSON)</a></p>')
+    return (
+        f'<div class="card border-0 shadow-sm mb-4 noprint"><div class="card-body py-3">'
+        f'<div class="d-flex flex-wrap gap-3 align-items-center small">'
+        f'<a class="fw-semibold text-decoration-none" href="/d/{i}/audit">📄 Open the audit record</a>'
+        f'<span class="text-muted">·</span>'
+        f'<a class="fw-semibold text-decoration-none" href="/d/{i}/audit.json">📥 Download the audit packet (JSON)</a>'
+        f'</div></div></div>'
+    )
 
 
 def audit_screen(packet: dict) -> str:
     rows = "".join(
         f"<tr><td>#{esc(r['seq'])}</td><td>{esc(r['decision_id'])}</td><td class=\"hash\">{esc(r['audit_hash'])}</td>"
-        f"<td>{'<span class=ok>matches</span>' if r['matches'] else '<span class=bad>does not match</span>'}</td></tr>"
+        f"<td>{'<span class=\"badge bg-success\">matches</span>' if r['matches'] else '<span class=\"badge bg-danger\">does not match</span>'}</td></tr>"
         for r in packet["recomputed_here"])
     log = packet.get("detector_log_verification") or {}
-    log_line = ('<span class="ok">The detector\'s whole log verifies</span>' if log.get("ok") else
-                '<span class="bad">The detector\'s log does not verify</span>' if log else '<span class="quiet">Detector log not checked</span>')
+    log_line = ('<span class="badge bg-success">The detector\'s whole log verifies</span>' if log.get("ok") else
+                '<span class="badge bg-danger">The detector\'s log does not verify</span>' if log else '<span class="text-muted small">Detector log not checked</span>')
     chain = packet["decisions"]
-    body = (f'<section class="panel"><h2>Audit record: invoice {esc(packet["invoice_id"])}</h2><p style="margin-top:0">Outcome: '
-            f'{pill(packet["outcome"] or "")} · generated {esc(when(packet["generated_at"]))}</p>'
-            f'<p class="noprint"><button onclick="window.print()">Print</button> <a href="/d/{esc(chain[-1]["decision_id"])}/audit.json">Download JSON</a> · '
-            f'<a href="/d/{esc(chain[-1]["decision_id"])}">Back to the decision</a></p></section>'
-            + trace_panel(chain, [{"at": _ts(e["at"]), "who": e["who"], "text": e["text"]} for e in packet["call_transcript"]])
-            + '<section class="panel"><h2>Every record, recomputed by this dashboard</h2>'
-              f'<p style="margin-top:0">{log_line}. Each hash below was recomputed here from the Decision itself.</p>'
-              f'<div class="scroll"><table><tr><th>Seq</th><th>Decision</th><th>audit_hash</th><th>Recomputed</th></tr>{rows}</table></div></section>'
-            + f'<section class="panel"><h2>Check it yourself</h2><p style="margin-top:0">{esc(packet["how_to_verify"])}</p>'
-              f'<pre class="hash" style="white-space:pre-wrap">{esc(packet["verify_in_python"])}</pre></section>')
+    transcript_events = [{"at": _ts(e["at"]), "who": e["who"], "text": e["text"]} for e in packet.get("call_transcript") or []]
+    body = (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<h4 class="card-title fw-bold mb-2">Audit record: invoice {esc(packet["invoice_id"])}</h4>'
+        f'<p class="text-muted small mb-3">Outcome: {pill(packet["outcome"] or "")} · generated {esc(when(packet["generated_at"]))}</p>'
+        f'<p class="noprint mb-0">'
+        f'<button class="btn btn-outline-secondary btn-sm me-2" onclick="window.print()">Print</button>'
+        f'<a class="btn btn-primary btn-sm me-2" href="/d/{esc(chain[-1]["decision_id"])}/audit.json">Download JSON</a>'
+        f'<a class="btn btn-link btn-sm text-decoration-none" href="/d/{esc(chain[-1]["decision_id"])}">Back to the decision</a>'
+        f'</p></div></div>'
+        + trace_panel(chain, transcript_events)
+        + f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+          f'<h5 class="card-title fw-bold mb-2">Every record, recomputed by this dashboard</h5>'
+          f'<p class="text-muted small mb-3">{log_line}. Each hash below was recomputed here from the Decision itself.</p>'
+          f'<div class="table-responsive"><table class="table table-hover align-middle mb-0">'
+          f'<thead class="table-light"><tr><th>Seq</th><th>Decision</th><th>audit_hash</th><th>Recomputed</th></tr></thead>'
+          f'<tbody>{rows}</tbody></table></div></div></div>'
+        + f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+          f'<h5 class="card-title fw-bold mb-2">Check it yourself</h5>'
+          f'<p class="text-muted small mb-2">{esc(packet["how_to_verify"])}</p>'
+          f'<pre class="hash bg-light p-3 rounded border" style="white-space:pre-wrap">{esc(packet["verify_in_python"])}</pre>'
+          f'</div></div>'
+    )
     return page(f"Audit record: {packet['invoice_id']}", body)
 
 
@@ -482,78 +919,164 @@ def _ts(iso: str) -> float:
     return dt.timestamp() if dt else 0.0
 
 
-def safe(fn, *args, **kwargs) -> str:
-    """Render one panel; if its data is too strange to draw, say so instead of failing the whole screen."""
-    try:
-        return fn(*args, **kwargs)
-    except Exception:  # noqa: BLE001  (a demo screen must never 500 over one panel)
-        import logging
-        logging.getLogger("doris.render").exception("panel %s failed", getattr(fn, "__name__", fn))
-        return '<section class="panel"><p class="quiet" style="margin:0">This panel could not be drawn from this decision.</p></section>'
-
-
 def review_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Optional[bool] = None,
                   call_text: str = "", can_call: bool = False, poll: bool = True, flash: str = "",
                   events: Optional[list[dict]] = None, live: bool = False) -> str:
-    if d.get("decision") == "BLOCKED":
+    verdict = d.get("decision", "")
+    if verdict == "BLOCKED":
         return blocked_screen(d, chain=chain, audit_ok=audit_ok, poll=poll, events=events)
-    label, cls, line = VERDICT.get(d.get("decision"), (d.get("decision"), "hold", ""))
-    body = [f'<p class="flash">{esc(flash)}</p>' if flash else "",
-            f'<section class="banner v-{cls}"><h1>{esc(label)}</h1><p>{esc(line)} Risk {float(d.get("risk_score") or 0):.2f}.</p></section>',
-            safe(trace_panel, chain or [d], events, live), safe(summary, d), safe(reasons, d)]
-    if d.get("decision") == "CALLBACK":
-        body.append(callback_panel(d, call_text, can_call))
-    if d.get("decision") == "HOLD":
-        body.append(review_panel(d))
-    body += [safe(hidden_text, d), safe(ct_strip, d), safe(signals_table, d), safe(audit_trail, chain or [d], audit_ok), audit_links(d)]
+    label, cls, line = VERDICT.get(verdict, (verdict, "secondary", ""))
+    hero = (
+        f'<section class="verdict-hero v-{cls} mb-4 shadow-sm">'
+        f'<div class="row align-items-center">'
+        f'<div class="col-md-8">'
+        f'<h1 class="display-4 fw-bold mb-1">{esc(label)}</h1>'
+        f'<p class="sub mb-0">{esc(line)} Risk {float(d.get("risk_score") or 0):.2f}.</p>'
+        f'</div>'
+        f'<div class="col-md-4 text-md-end mt-3 mt-md-0">'
+        f'<span class="verdict-badge">{esc(label)}</span>'
+        f'</div>'
+        f'</div>'
+        f'</section>'
+    )
+    flash_html = f'<div class="alert alert-warning mb-4 shadow-sm">{esc(flash)}</div>' if flash else ""
+    body_parts = [
+        flash_html,
+        hero,
+        safe(trace_panel, chain or [d], events, live),
+        safe(summary, d),
+        safe(reasons, d),
+    ]
+    if verdict == "CALLBACK":
+        body_parts.append(safe(callback_panel, d, call_text, can_call))
+    if verdict == "HOLD":
+        body_parts.append(safe(review_panel, d))
+    body_parts += [
+        safe(hidden_text, d),
+        safe(ct_strip, d),
+        safe(signals_table, d),
+        safe(audit_trail, chain or [d], audit_ok),
+        audit_links(d),
+    ]
     url = f"/d/{d.get('decision_id')}/state" if poll else None
-    return page(f"{label}: {d.get('invoice_id')}", "".join(body), poll=url, decision_id=d.get("decision_id"),
+    return page(f"{label}: {d.get('invoice_id')}", "".join(body_parts), poll=url, decision_id=d.get("decision_id"),
                 chain_ids=[x.get("decision_id") for x in (chain or [d]) if x.get("decision_id")])
 
 
 def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Optional[bool] = None, poll: bool = True,
                    events: Optional[list[dict]] = None) -> str:
     headline = (d.get("reasons") or ["Blocked"])[0]
-    hero = (f'<section class="blocked-hero"><h1>BLOCKED</h1><p>{esc(headline)}</p>'
-            f'<p style="font-size:16px;opacity:.9">{money(d.get("amount"), d.get("currency"))} to {esc(d.get("payee_name") or "an unknown payee")} '
-            f'stays put. Risk {float(d.get("risk_score") or 0):.2f}.</p></section>')
-    body = (hero + safe(trace_panel, chain or [d], events) + "".join(safe(f, d) for f in (summary, reasons, hidden_text, ct_strip))
-            + safe(audit_trail, chain or [d], audit_ok) + audit_links(d) + safe(signals_table, d))
+    hero = (
+        f'<section class="verdict-hero v-blocked mb-4 shadow-sm">'
+        f'<div class="row align-items-center">'
+        f'<div class="col-md-8">'
+        f'<h1 class="display-4 fw-bold mb-1">BLOCKED</h1>'
+        f'<p class="sub mb-1">{esc(headline)}</p>'
+        f'<p class="mb-0" style="font-size:1.1rem;opacity:.95">'
+        f'{money(d.get("amount"), d.get("currency"))} to {esc(d.get("payee_name") or "an unknown payee")} stays put. Risk {float(d.get("risk_score") or 0):.2f}.'
+        f'</p>'
+        f'</div>'
+        f'<div class="col-md-4 text-md-end mt-3 mt-md-0">'
+        f'<span class="verdict-badge">Blocked</span>'
+        f'</div>'
+        f'</div>'
+        f'</section>'
+    )
+    body = (
+        hero
+        + safe(trace_panel, chain or [d], events)
+        + "".join(safe(f, d) for f in (summary, reasons, hidden_text, ct_strip))
+        + safe(audit_trail, chain or [d], audit_ok)
+        + audit_links(d)
+        + safe(signals_table, d)
+    )
     url = f"/d/{d.get('decision_id')}/state" if poll else None
     return page(f"BLOCKED: {d.get('invoice_id')}", body, body_class="blocked-screen", poll=url, decision_id=d.get("decision_id"),
                 chain_ids=[x.get("decision_id") for x in (chain or [d]) if x.get("decision_id")])
+
+
+EMPTY_ROWS = '<tr><td colspan="6" class="text-center text-muted py-4">No decisions yet</td></tr>'
 
 
 def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = True, flash: str = "",
                  live_from: Optional[str] = None) -> str:
     rows = []
     for d in decisions:
-        rows.append(f'<tr><td>{esc(when(d.get("created_at"), "short"))}</td><td><a href="/d/{esc(d.get("decision_id"))}">{esc(d.get("invoice_id"))}</a></td>'
-                    f'<td>{esc(d.get("vendor_claimed") or "")}</td><td>{money(d.get("amount"), d.get("currency"))}</td>'
-                    f'<td>{pill(d.get("decision", ""))}</td><td>{float(d.get("risk_score") or 0):.2f}</td></tr>')
-    status = '<span class="ok">Detector connected</span>' if detector_ok else '<span class="bad">Detector not reachable</span>'
-    demo_form = ('<form class="inline" method="post" action="/demo/send"><button class="primary">Send the demo bank-change email</button>'
-                 '<button formaction="/demo/send?scenario=payroll">Send the payroll direct-deposit email</button>'
-                 '<span class="quiet">Runs a demo email through Doris and opens its screen.</span></form>'
-                 '<p class="quiet" style="margin:8px 0 0"><a href="/?live=1">Live mode</a>: this page opens each new decision the moment it arrives.</p>') if demo else ""
+        rows.append(
+            f'<tr>'
+            f'<td class="text-nowrap">{esc(when(d.get("created_at"), "short"))}</td>'
+            f'<td><a class="fw-semibold text-decoration-none" href="/d/{esc(d.get("decision_id"))}">{esc(d.get("invoice_id"))}</a></td>'
+            f'<td>{esc(d.get("vendor_claimed") or "")}</td>'
+            f'<td class="fw-semibold">{money(d.get("amount"), d.get("currency"))}</td>'
+            f'<td>{pill(d.get("decision", ""))}</td>'
+            f'<td class="text-end font-monospace">{float(d.get("risk_score") or 0):.2f}</td>'
+            f'</tr>'
+        )
+    status_badge = '<span class="badge bg-success">Detector connected</span>' if detector_ok else '<span class="badge bg-danger">Detector not reachable</span>'
+    demo_form = (
+        f'<div class="d-flex flex-wrap align-items-center gap-3 mt-2">'
+        f'<form method="post" action="/demo/send">'
+        f'<button class="btn btn-primary btn-verdict">Send the demo bank-change email</button> '
+        f'<button class="btn btn-outline-primary btn-verdict" formaction="/demo/send?scenario=payroll">Send the payroll direct-deposit email</button>'
+        f'</form>'
+        f'<span class="text-muted small">Runs a demo email through Doris and opens its decision screen.</span>'
+        f'</div>'
+        f'<p class="text-muted small mt-2 mb-0">'
+        f'<a class="text-decoration-none fw-semibold" href="/?live=1">Live mode</a> — this page opens each new decision the moment it arrives.'
+        f'</p>'
+    ) if demo else ""
     door = ""
     if stats:
-        door = (f'<section class="panel"><h2>Forward-to-check door</h2><p style="margin:0">{esc(stats.get("checks", 0))} emails checked, '
-                f'{esc(stats.get("scam", 0))} called a scam, {esc(stats.get("suspicious", 0))} suspicious. Feedback: '
-                f'{esc(stats.get("up", 0))} right, {esc(stats.get("down", 0))} wrong.</p></section>')
-    body = (f'<p class="flash">{esc(flash)}</p>' if flash else "") + \
-           f'<section class="panel"><p style="margin-top:0">{status}.</p>{demo_form}</section>{door}' + \
-           ('<section class="panel"><h2>Decisions, newest first</h2><div class="scroll"><table><tr><th>When</th><th>Invoice</th><th>Claims to be</th>'
-            f'<th>Amount</th><th>Decision</th><th>Risk</th></tr>{"".join(rows) or "<tr><td colspan=6>No decisions yet</td></tr>"}</table></div></section>')
+        door = (
+            f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+            f'<h6 class="card-title text-uppercase text-muted small fw-bold">Forward-to-check door</h6>'
+            f'<p class="mb-0">{esc(stats.get("checks", 0))} emails checked, '
+            f'{esc(stats.get("scam", 0))} called a scam, {esc(stats.get("suspicious", 0))} suspicious. Feedback: '
+            f'{esc(stats.get("up", 0))} right, {esc(stats.get("down", 0))} wrong.</p>'
+            f'</div></div>'
+        )
+    flash_html = f'<div class="alert alert-warning mb-4 shadow-sm">{esc(flash)}</div>' if flash else ""
+    header_card = (
+        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+        f'<div class="d-flex justify-content-between align-items-center mb-2">'
+        f'<h5 class="card-title fw-bold mb-0">System Status</h5>'
+        f'{status_badge}'
+        f'</div>'
+        f'{demo_form}'
+        f'</div></div>'
+    )
+    table_card = (
+        f'<div class="card border-0 shadow-sm"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-3">Decisions, newest first</h5>'
+        f'<div class="table-responsive">'
+        f'<table class="table table-hover align-middle mb-0">'
+        f'<thead class="table-light"><tr><th>When</th><th>Invoice</th><th>Claims to be</th><th>Amount</th><th>Decision</th><th class="text-end">Risk</th></tr></thead>'
+        f'<tbody>{"".join(rows) or EMPTY_ROWS}</tbody>'
+        f'</table>'
+        f'</div></div></div>'
+    )
+    body = flash_html + header_card + door + table_card
     if live_from is not None:
         return page("Doris queue (live)", body, poll="/latest/state", decision_id=live_from)
     return page("Doris queue", body)
 
 
 def samples_screen(names: list[str]) -> str:
-    links = "".join(f'<li><a href="/samples/{esc(n)}">{esc(n)}</a></li>' for n in names)
-    return page("Contract samples", f'<section class="panel"><h2>Contract samples</h2><p class="quiet" style="margin-top:0">Each renders '
-                                    f'exactly as a live Decision would. No detector needed.</p><ul>{links}</ul></section>')
+    links = "".join(
+        f'<li class="list-group-item d-flex justify-content-between align-items-center py-3">'
+        f'<a class="text-decoration-none fw-semibold" href="/samples/{esc(n)}">{esc(n)}</a>'
+        f'<span class="badge bg-secondary rounded-pill">sample</span>'
+        f'</li>'
+        for n in names
+    )
+    return page(
+        "Contract samples",
+        f'<div class="card border-0 shadow-sm"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-2">Contract Samples</h5>'
+        f'<p class="text-muted small mb-3">Each renders exactly as a live Decision would. No detector needed.</p>'
+        f'<ul class="list-group list-group-flush border-top">{links}</ul>'
+        f'</div></div>'
+    )
 
 
 def json_dumps(value: Any) -> str:
