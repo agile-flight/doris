@@ -20,8 +20,8 @@ tamper-evident record, and every screen watching updates live. On our test sets 
 blocking one real vendor.
 
 The same engine, unchanged, stops an employee's "please update my direct deposit" sent from a personal email: Doris
-calls the phone payroll already had. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is
-the same answer.
+calls the phone payroll already had, and asks CRS whether that email even belongs to the person on file. Payroll,
+wires, closings and helpdesk resets are the same attack, and Doris is the same answer.
 
 ## Tagline (one line)
 
@@ -55,6 +55,9 @@ harder to fool, not easier.
   and a screen that flips to BLOCKED the moment the vendor says "we never changed our bank."
 - **Works for people as well as companies**: the same engine, unchanged, checks an employee's direct-deposit change
   against their record on file and calls the phone payroll already had.
+- **Checks the channel itself with CRS**: for a person's request, Doris sends CRS Fraud Finder the email and origin
+  IP it came from plus the name, phone and address on file. A high CRS risk (the demo's email is three days old)
+  goes on screen and into the audit trail, and keeps the money from moving even after a yes on the call.
 - **Is audit-ready**: every decision is a record in a hash chain; the dashboard recomputes every hash itself
   and exports an audit packet with a Python snippet anyone can run to check it.
 
@@ -66,6 +69,8 @@ harder to fool, not easier.
   sees hidden text and has no ability to pay. Certificate Transparency via crt.sh.
 - **Surfaces** (Python): the review and BLOCKED screens, the live trace, the audit packet, the callback
   (Twilio Programmable Voice plus a Cartesia sonic-3 voice), and a forward-to-check door.
+- **CRS Credit API sandbox**: Fraud Finder (AtData) on the channel a person's request came in on. Bearer login once,
+  no retry after a failed login (repeated failures lock the sandbox account), and only CRS sandbox personas are sent.
 - **A frozen contract** (JSON Schema for the Decision object) split the work between two agents running in
   parallel, with a Stop hook that refused to end any turn that broke the contract.
 - Built with Claude Code; tunnelled with Tailscale Funnel so Twilio can reach the webhooks while the dashboard
@@ -104,7 +109,7 @@ vendor's own mailbox is compromised.
 
 ## Built with
 
-python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie, typescript, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
+python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie, crs-credit-api, atdata, typescript, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
 
 ## Sponsor tracks (one paragraph each, in the description or the track field)
 
@@ -122,6 +127,16 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie
 - **Capital One: Best Use of Nessie.** Doris moves the money herself: when a decision ends in PAY she sends the payment
   through the Nessie sandbox, once, and the receipt ("Paid through Capital One: $4,820.00 to Acme Supply Co., transfer
   2d1d5f39") lands in the live trace and on the shared desk; a BLOCKED decision records that nothing was sent.
+- **CRS: Best Identity / Fraud Innovation (also Best Overall CRS Hack and Best Financial AI Agent).** Doris's rule is
+  never verify a request through the channel it came in on, and CRS lets her test that channel against an independent
+  source. When an employee's "please update my direct deposit" arrives from a personal address, Doris sends CRS Fraud
+  Finder (AtData) the email and origin IP the request came from, together with the name, phone and home address payroll
+  already has on file, and asks whether that email belongs to that person. In the live demo CRS answers risk 88 of 100:
+  an address first seen three days ago that doesn't match the person on file. The answer goes on the review screen and
+  into the hash-chained audit trail, and a high CRS risk (above 60 of 100, CRS's own "high" label) means Doris won't pay out even after a yes on the
+  call: a person has to release it. Responsible with data: Doris sends only the fields the check needs, only CRS
+  sandbox persona data, never a real person's details; she logs in once and never retries a failed login, and the
+  credentials live in a private file outside the repo.
 - **Cartesia: Best Use of Cartesia.** Doris's voice is Cartesia sonic-3 (the Jolene voice), rendered as telephone
   audio and cached per line; it's the whole verification step, not a garnish.
 - **Armadin: Best Security Hack.** Three adversarial reviews and a 38-attack replay suite; lookalike, homoglyph,
@@ -135,6 +150,7 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie
 .venv/bin/pytest -q
 .venv/bin/python -m detector --offline evaluate
 .venv/bin/python -m detector --offline evaluate --testset detector/testset/cases_doj.json
+DORIS_KEYS_FILE=$HOME/Downloads/doris_crs.env .venv/bin/python -m surfaces crs-check   # your CRS credentials
 ```
 
 ## The 3-minute pitch
@@ -155,8 +171,9 @@ Hand a judge the phone that's on file for Acme Supply before you start. Keep the
 4. **Under the hood, 50 s (Technical complexity).** The prompt-injection invoice: "Their hidden 'approve this'
    text became our evidence." The certificate strip. "Even with the vendor's real line and a cloned voice, a yes
    needs the last payment on file." Open the audit record: "The dashboard recomputes every hash itself."
-   Ten seconds, the platform moment: press "Send the payroll direct-deposit email." "Same engine, untouched: an
-   employee's 'update my direct deposit' from a personal email. Doris calls the phone payroll already had." 
+   Fifteen seconds, the platform moment: press "Send the payroll direct-deposit email." "Same engine, untouched: an
+   employee's 'update my direct deposit' from a personal email. Doris calls the phone payroll already had, and CRS
+   tells her that email was first seen three days ago, so even a yes on the call won't pay it out." 
 5. **Proof and close, 30 s (Creativity).** "14 of 15 frauds stopped, zero real vendors blocked; three adversarial
    reviews, 41 gaps fixed. The more convincing scams get, the less it matters to Doris, because she never judges how
    convincing anything is. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is the same
@@ -172,5 +189,6 @@ Under 3 minutes, screen plus the phone's speaker:
 1. 10 s: the tagline over the queue screen.
 2. 60 s: the live demo exactly as in the pitch, with the phone on speaker so the call is audible.
 3. 30 s: the prompt-injection invoice blocking, with the hidden text shown as evidence.
-4. 20 s: the audit record recomputing every hash.
-5. 10 s: the test results and the GitHub link.
+4. 20 s: the payroll email, with the CRS Fraud Finder result on screen (CRS judges from this).
+5. 20 s: the audit record recomputing every hash.
+6. 10 s: the test results and the GitHub link.

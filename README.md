@@ -17,8 +17,8 @@ tamper-evident record, and every screen watching updates live. On our test sets 
 blocking one real vendor.
 
 The same engine, unchanged, stops an employee's "please update my direct deposit" sent from a personal email: Doris
-calls the phone payroll already had. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is
-the same answer.
+calls the phone payroll already had, and asks CRS's Fraud Finder whether the email the request came from belongs to
+the person on file. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is the same answer.
 
 ## How it works
 
@@ -35,7 +35,10 @@ the same answer.
    never reads out a number to call. A denial blocks; a confirmed yes pays; anything unclear holds for a person.
    For a person rather than a company (an employee's direct-deposit change), the same call asks "did you ask to
    change your direct deposit?" 
-6. **The record**: every decision is a link in a hash chain. The screen shows a live timeline of what Doris did,
+6. **The independent check (CRS)**: for a person's request, Doris sends CRS Fraud Finder (AtData) the email and
+   origin IP it came from, with the name, phone and address on file. A high risk goes on screen and into the
+   record, and a payment it flags waits for a person even after a yes on the call. Only CRS sandbox personas are sent.
+7. **The record**: every decision is a link in a hash chain. The screen shows a live timeline of what Doris did,
    with the call transcript, and exports an audit packet anyone can verify with five lines of Python.
 
 ## What's in the repo
@@ -56,7 +59,7 @@ uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python -e ".[de
 .venv/bin/python -m detector serve                    # the detector API on :8787
 .venv/bin/python -m surfaces serve                    # the dashboard on http://127.0.0.1:8788
 ```
-Live calls, the public webhook and the shared desk need private keys; the full demo setup is in
+Live calls, the public webhook, the shared desk, Nessie payments and the CRS check need private keys; the full demo setup is in
 [HANDOFF.md](HANDOFF.md) and [surfaces/README.md](surfaces/README.md).
 
 ## Proof
