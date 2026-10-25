@@ -51,19 +51,24 @@ def lines(decision: dict, company: str) -> dict[str, str]:
     last4 = spaced((decision.get("bank_account_new") or "")[-4:])
     ask = f"ending in {last4}" if last4 else "at a new bank"
     return {
-        "prompt": (f"Hi, this is Doris from accounts payable at {company}. We got an email asking us to send your payments "
-                   f"to a different bank account, {ask}. Before we pay anything: did your company change its bank account? "
+        # Doris says she is automated, and asks for nothing a scammer could misuse: the same rule both ways.
+        "prompt": (f"Hi, this is Doris, an automated assistant from accounts payable at {company}. We got an email asking us "
+                   f"to send your payments to a different bank account, {ask}. I won't ask you for any account details. "
+                   "Before we pay anything: did your company change its bank account? "
                    "Please say yes or no. Or press 1 for yes, 2 for no."),
         "reprompt": "Sorry, hon, I didn't catch that. Did your company change its bank account? Say yes or no, or press 1 for yes, 2 for no.",
         "confirm": (f"Just to be sure, hon: your company did change its bank account, to the one {ask}? "
                     "Say yes again, or press 1. If not, say no, or press 2."),
         "denied": "Thank you. Then that email wasn't from you. I'm stopping the payment right now and flagging it as fraud. Bye now.",
         "confirmed": "Thanks for confirming. I'll update our records and release the payment. Bye now.",
-        "unclear": "No problem. I'll hold the payment and someone from our team will call you back. Goodbye.",
+        "unclear": (f"No problem. I'll hold the payment. If you'd like, call our accounts payable team on the number "
+                    f"you already have for {company}. Goodbye."),
         "handled": "Thanks for picking up. This one has already been taken care of, so there's nothing you need to do. Bye now.",
         "verify": ("One last check, hon, so I know it's really you: what was the amount of the last payment we sent you? "
-                   "You can say it, or type it in whole dollars and press pound."),
-        "verify_failed": "Thanks. I couldn't match that to our records, so I'll hold the payment and someone from our team will follow up. Goodbye.",
+                   "You can say it, or type it in whole dollars and press pound. If you'd rather not say, hang up and call "
+                   f"our accounts payable team on the number you already have for {company}. Nothing gets paid until we hear from you."),
+        "verify_failed": (f"Thanks. I couldn't match that to our records, so I'll hold the payment. Please call our accounts payable "
+                          f"team on the number you already have for {company}. Goodbye."),
     }
 
 

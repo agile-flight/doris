@@ -64,6 +64,13 @@ Feedback links open a page whose button records the label, so link scanners can'
   recomputed by the dashboard itself; `/d/<id>/audit.json` downloads the same as an audit packet, with a Python
   snippet anyone can run to check the hashes.
 
+## Doris applies her own rule in both directions
+
+The vendor shouldn't trust an incoming call either. Doris opens by saying she is an automated assistant, says she
+won't ask for any account details, and asks only yes or no. When she does ask for something (the last-payment
+check), and whenever she holds a payment, she offers a way out: hang up and call our AP team on the number the
+vendor already has for us. She never gives a number to call, because that is exactly what a scammer would do.
+
 ## AI fraud: a hijacked line, a cloned voice, forged documents
 
 - After a vendor says yes twice, Doris asks the amount of the last payment we sent them (read from the payment

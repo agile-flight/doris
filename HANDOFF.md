@@ -123,6 +123,7 @@ Still open: a vendor whose mailbox is compromised (vendor email compromise) can 
 channel, a code emailed to the address on file, would cover it once Postmark is configured.
 
 ## Calls made that interpret the build doc
+- Doris discloses she's an automated assistant, asks for no account details, and offers a call-back on the number the vendor already has for us (never one she reads out). That answers "isn't this a robocall / social engineering?" Note the FCC treats AI-generated voices in calls as artificial voice under the TCPA.
 - Hidden HTML text in the email body blocks only when it carries instructions (approve, ignore, do not flag, AI-addressed). Templated vendor mail hides preheaders by design; blocking those would wreck the false-positive rate. Hidden PDF text still blocks on any meaningful words.
 - A message that claims a bank change always earns the callback, even when the account's last 4 match the record.
 - A bank change with a number on file 90+ days is always `CALLBACK`, even at a high score; the call is the verification and the best evidence. Only prompt injection blocks outright (score floored at 0.95).
