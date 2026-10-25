@@ -50,6 +50,24 @@ def spaced(digits: Optional[str]) -> str:
 def lines(decision: dict, company: str) -> dict[str, str]:
     last4 = spaced((decision.get("bank_account_new") or "")[-4:])
     ask = f"ending in {last4}" if last4 else "at a new bank"
+    if str(decision.get("vendor_id") or "").startswith("emp_"):
+        # The same call for a person: an employee's direct-deposit change, checked against the phone HR already had.
+        return {
+            "prompt": (f"Hi, this is Doris, an automated assistant from payroll at {company}. We got an email asking us to send "
+                       f"your pay to a different bank account, {ask}. I won't ask you for any account details. Before we change "
+                       "anything: did you ask to change your direct deposit? Please say yes or no. Or press 1 for yes, 2 for no."),
+            "reprompt": "Sorry, I didn't catch that. Did you ask to change your direct deposit? Say yes or no, or press 1 for yes, 2 for no.",
+            "confirm": (f"Just to be sure: you did ask us to move your pay to the account {ask}? "
+                        "Say yes again, or press 1. If not, say no, or press 2."),
+            "denied": "Thank you. Then that email wasn't from you. Your pay stays where it is, and I'm flagging the request as fraud. Bye now.",
+            "confirmed": "Thanks for confirming. I'll update your direct deposit. Bye now.",
+            "unclear": f"No problem. I'll leave your direct deposit as it is. If you'd like, call payroll on the number you already have for {company}. Goodbye.",
+            "handled": "Thanks for picking up. This one has already been taken care of, so there's nothing you need to do. Bye now.",
+            "verify": ("One last check, so I know it's really you: what was the amount of your last paycheck? You can say it, or type it "
+                       "in whole dollars and press pound. If you'd rather not say, hang up and call payroll on the number you already have "
+                       f"for {company}. Nothing changes until we hear from you."),
+            "verify_failed": f"Thanks. I couldn't match that to our records, so I'll leave your direct deposit as it is. Please call payroll on the number you already have for {company}. Goodbye.",
+        }
     return {
         # Doris says she is automated, and asks for nothing a scammer could misuse: the same rule both ways.
         "prompt": (f"Hi, this is Doris, an automated assistant from accounts payable at {company}. We got an email asking us "

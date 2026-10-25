@@ -24,6 +24,7 @@ from .store import Store
 log = logging.getLogger("doris.surfaces")
 SAMPLES_DIR = ROOT / "contract" / "samples"
 DEMO_EMAIL = Path(__file__).resolve().parent / "demo" / "bank_change_demo.eml"
+DEMO_EMAILS = {"vendor": DEMO_EMAIL, "payroll": Path(__file__).resolve().parent / "demo" / "payroll_change_demo.eml"}
 
 
 class Surfaces:
@@ -234,7 +235,8 @@ class DashboardHandler(_Base):
         path = urlparse(self.path).path.rstrip("/")
         form = _form(self)
         if path == "/demo/send":
-            decision = self.app.client.check_raw(DEMO_EMAIL.read_bytes())
+            scenario = (parse_qs(urlparse(self.path).query).get("scenario") or ["vendor"])[0]
+            decision = self.app.client.check_raw(DEMO_EMAILS.get(scenario, DEMO_EMAIL).read_bytes())
             self.app.maybe_auto_call(decision)
             return self.redirect(f"/d/{quote(decision['decision_id'])}")
         m = re.fullmatch(r"/d/([^/]+)/(review|manual_callback|call)", path)

@@ -2,17 +2,23 @@
 
 *Doris only trusts what's on file.*
 
-Doris is an AI accounts-payable clerk that stops the most expensive email in business: "we changed our bank account,
-please pay us here." Business email compromise, the scam built on that email, drew about $3 billion in losses reported to the FBI last
-year, and AI makes those emails more convincing every month. Doris doesn't care how convincing an email is, because she never judges the message. She checks it against
-what's already on file. She reads each invoice and runs eight checks: a changed account, a lookalike domain, a web
-certificate issued days ago, hidden text telling an AI to approve the payment, and more. Claude judges whether the
-story matches a known fraud script. Then, instead of trusting the email, she phones the vendor in her own voice at
-the number she's had on file for at least 90 days. "We never changed our bank" blocks the payment on screen the
-moment it's said. A yes has to be repeated and backed by the last payment on file, so even a hijacked phone line
-answered by a cloned voice can't release money. Every step is a tamper-evident record the dashboard re-verifies
-itself, and every screen watching updates live. It works on real phone calls today, and on our test sets it
-stopped 26 of 27 frauds without blocking a single real vendor.
+Most expensive fraud works the same way: a request arrives through a channel the attacker controls, an email, a text
+or a call, and asks you to send money or access somewhere new. Doris answers all of it with one rule: never verify a
+request through the channel it came in on. Check it against what you already had, and confirm it through a channel you
+already trusted.
+
+We built her deepest where the money is biggest: accounts payable, where "we changed our bank account, please pay us
+here" drew about $3 billion in losses reported to the FBI last year. Doris reads each invoice, runs eight checks (a
+changed account, a lookalike domain, a web certificate issued days ago, hidden text telling an AI to approve it) and
+has Claude judge the story. Then she phones the vendor in her own voice at the number she's had for at least 90 days.
+"We never changed our bank" blocks the payment on screen the moment it's said. A yes has to be repeated and backed by
+the last payment on file, so even a hijacked line answered by a cloned voice can't release money. Every step is a
+tamper-evident record, and every screen watching updates live. On our test sets she stopped 26 of 27 frauds without
+blocking one real vendor.
+
+The same engine, unchanged, stops an employee's "please update my direct deposit" sent from a personal email: Doris
+calls the phone payroll already had. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is
+the same answer.
 
 ## How it works
 
@@ -27,6 +33,8 @@ stopped 26 of 27 frauds without blocking a single real vendor.
    rules decide: pay, hold for a person, call the vendor, or block. Hidden "approve this" text blocks outright.
 5. **The call**: Twilio and a Cartesia voice. Doris says she's an automated assistant, asks only yes or no, and
    never reads out a number to call. A denial blocks; a confirmed yes pays; anything unclear holds for a person.
+   For a person rather than a company (an employee's direct-deposit change), the same call asks "did you ask to
+   change your direct deposit?" 
 6. **The record**: every decision is a link in a hash chain. The screen shows a live timeline of what Doris did,
    with the call transcript, and exports an audit packet anyone can verify with five lines of Python.
 
@@ -43,7 +51,7 @@ stopped 26 of 27 frauds without blocking a single real vendor.
 
 ```bash
 uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python -e ".[dev]"
-.venv/bin/pytest -q                                   # 374 tests, offline, no network
+.venv/bin/pytest -q                                   # 379 tests, offline, no network
 .venv/bin/python -m detector --offline evaluate       # the confusion matrix
 .venv/bin/python -m detector serve                    # the detector API on :8787
 .venv/bin/python -m surfaces serve                    # the dashboard on http://127.0.0.1:8788
@@ -59,6 +67,7 @@ Live calls, the public webhook and the shared desk need private keys; the full d
 | Frauds stopped, DOJ-typology set | 12 of 12 |
 | Legitimate invoices blocked, both sets | 0 of 20 (4 held or called back by design: first-time vendors, genuine bank changes) |
 | Real calls | 3: voicemail held the payment; a spoken "no" and a keypad "2" each flipped the screen to BLOCKED |
+| Second scenario | A payroll direct-deposit change runs through the same engine and calls the employee's phone on file |
 | Adversarial reviews | 3, finding 41 gaps; every one fixed and pinned by a regression test |
 
 Submission text, sponsor tracks and the pitch: [SUBMISSION.md](SUBMISSION.md). Status and known limits:

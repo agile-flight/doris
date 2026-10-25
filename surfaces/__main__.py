@@ -20,6 +20,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("demo-seed", help="seed a demo detector database whose Acme record rings the judges' table")
     p.add_argument("--phone", required=True, help="E.164 number of the phone on the judges' table, e.g. +14155550123")
     p.add_argument("--db", default="data/demo.db", help="detector database to seed (use the same DORIS_DB for serve)")
+    p.add_argument("--add", action="store_true", help="add missing demo records to an existing database")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(name)s: %(message)s")
     settings = Settings.from_env()
@@ -29,7 +30,7 @@ def main(argv=None) -> int:
         settings.hooks_port = args.hooks_port
     if args.cmd == "demo-seed":
         from .demo import seed_demo
-        print(seed_demo(args.phone, args.db))
+        print(seed_demo(args.phone, args.db, add=args.add))
         return 0
     if args.cmd == "serve":
         if getattr(args, "role", None):

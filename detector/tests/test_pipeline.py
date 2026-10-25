@@ -115,7 +115,7 @@ def test_callback_denied_blocks_and_supersedes(doris):
     cb = signal(follow, "callback_result")
     assert cb["fired"] and cb["weight"] == "gate" and "we never changed our bank" in cb["detail"]
     assert cb["evidence"]["vendor_confirmed"] is False and cb["evidence"]["called"] == "+14155550123"
-    assert follow["reasons"][0].startswith("Vendor AP at the number on file said")
+    assert follow["reasons"][0].startswith("At the number on file, they said")
     assert doris.verify().ok
     listed = doris.list_decisions()
     assert [x["decision_id"] for x in listed[:2]] == [follow["decision_id"], first["decision_id"]]

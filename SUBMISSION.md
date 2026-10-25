@@ -3,20 +3,30 @@
 Paste each section into the matching Devpost field. Numbers are as of 2026-10-25, 03:00; re-run the commands
 under "Proof" if anything changes before submitting.
 
-## The pitch in one paragraph
+## The pitch
 
-Doris is an AI accounts-payable clerk that stops the most expensive email in business: "we changed our bank account,
-please pay us here." She never judges how convincing the email is; she checks it against what's on file, runs eight
-checks (a changed account, a lookalike domain, a certificate issued days ago, hidden text telling an AI to approve
-it) and has Claude judge the story. Then she phones the vendor in her own voice at the number she's had for at least
-90 days. "We never changed our bank" blocks the payment on screen the moment it's said, and a yes needs the last
-payment on file, so a hijacked line with a cloned voice still can't release money. Every step is a tamper-evident
-record, every screen updates live, and on our test sets she stopped 26 of 27 frauds without blocking one real vendor.
+Most expensive fraud works the same way: a request arrives through a channel the attacker controls, an email, a text
+or a call, and asks you to send money or access somewhere new. Doris answers all of it with one rule: never verify a
+request through the channel it came in on. Check it against what you already had, and confirm it through a channel you
+already trusted.
+
+We built her deepest where the money is biggest: accounts payable, where "we changed our bank account, please pay us
+here" drew about $3 billion in losses reported to the FBI last year. Doris reads each invoice, runs eight checks (a
+changed account, a lookalike domain, a web certificate issued days ago, hidden text telling an AI to approve it) and
+has Claude judge the story. Then she phones the vendor in her own voice at the number she's had for at least 90 days.
+"We never changed our bank" blocks the payment on screen the moment it's said. A yes has to be repeated and backed by
+the last payment on file, so even a hijacked line answered by a cloned voice can't release money. Every step is a
+tamper-evident record, and every screen watching updates live. On our test sets she stopped 26 of 27 frauds without
+blocking one real vendor.
+
+The same engine, unchanged, stops an employee's "please update my direct deposit" sent from a personal email: Doris
+calls the phone payroll already had. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is
+the same answer.
 
 ## Tagline (one line)
 
-Doris only trusts what's on file: an AI accounts-payable clerk that stops "we changed our bank account" fraud and
-verifies by calling the vendor at the number she already had.
+Never verify a request through the channel it came in on: Doris checks every bank change against what's on file
+and calls back on the number she already had.
 
 ## Inspiration
 
@@ -43,6 +53,8 @@ harder to fool, not easier.
   voice still can't release money. Voicemail, hedges and silence leave the payment frozen for a person.
 - **Shows its work**: a live timeline of what Doris did, with the call transcript appearing as it happens,
   and a screen that flips to BLOCKED the moment the vendor says "we never changed our bank."
+- **Works for people as well as companies**: the same engine, unchanged, checks an employee's direct-deposit change
+  against their record on file and calls the phone payroll already had.
 - **Is audit-ready**: every decision is a record in a hash chain; the dashboard recomputes every hash itself
   and exports an audit packet with a Python snippet anyone can run to check it.
 
@@ -75,7 +87,7 @@ harder to fool, not easier.
   flips to BLOCKED on its own.
 - On our labelled test sets Doris never blocked a legitimate invoice: 14 of 15 frauds stopped (main set) and 12 of
   12 (a DOJ-typology set), with 0 legitimate invoices blocked outright.
-- 374 automated tests, run against a real detector process.
+- 379 automated tests, run against a real detector process.
 
 ## What we learned
 
@@ -85,7 +97,8 @@ Doris asks for nothing secret and invites them to call back on a number they alr
 
 ## What's next
 
-A shared blocklist of mule accounts and lookalike domains across companies, so one company's catch protects the
+The same rule for the rest of the family: executive wire requests, real-estate closing funds, and IT helpdesk
+resets. A shared blocklist of mule accounts and lookalike domains across companies, so one company's catch protects the
 next. Bank account-ownership checks before the call. A one-time code to the email on file for the case where the
 vendor's own mailbox is compromised.
 
@@ -129,9 +142,10 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, typescript, sqlite
 
 Hand a judge the phone that's on file for Acme Supply before you start. Keep the dashboard open on `/?live=1`.
 
-1. **Opener, 20 s (Application).** "Every company used to have a Doris: the AP veteran who'd hear 'we changed
-   banks' and say 'sure, hon, I'll call you back on the number we have.' Last year this one email cost US
-   businesses three billion dollars. We built a Doris that never takes a day off."
+1. **Opener, 20 s (Application).** "The most expensive fraud has one shape: a request arrives through a channel the
+   attacker controls and asks you to send money somewhere new. The fix is one rule every company used to have in a
+   person, the AP veteran who'd say 'sure, hon, I'll call you back on the number we have.' Never verify a request
+   through the channel it came in on. We built that person: Doris." 
 2. **The principle, 20 s (Intentionality).** "Doris never trusts the email. She checks it against what was on file
    before it arrived, and the number she calls has to have been on file for 90 days, so you can't swap the phone
    number first."
@@ -142,9 +156,12 @@ Hand a judge the phone that's on file for Acme Supply before you start. Keep the
 4. **Under the hood, 50 s (Technical complexity).** The prompt-injection invoice: "Their hidden 'approve this'
    text became our evidence." The certificate strip. "Even with the vendor's real line and a cloned voice, a yes
    needs the last payment on file." Open the audit record: "The dashboard recomputes every hash itself."
+   Ten seconds, the platform moment: press "Send the payroll direct-deposit email." "Same engine, untouched: an
+   employee's 'update my direct deposit' from a personal email. Doris calls the phone payroll already had." 
 5. **Proof and close, 30 s (Creativity).** "14 of 15 frauds stopped, zero real vendors blocked; three adversarial
    reviews, 41 gaps fixed. The more convincing scams get, the less it matters to Doris, because she never judges how
-   convincing anything is. Doris only trusts what's on file."
+   convincing anything is. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is the same
+   answer. Doris only trusts what's on file." 
 
 Two minutes of questions follow. Likely ones: "isn't this a robocall?" (she says she's automated, asks for
 nothing secret, and offers a call-back on a number they already have); "false positives?" (0 blocked; holds are by

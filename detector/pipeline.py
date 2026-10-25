@@ -157,8 +157,8 @@ class Doris:
             since_text = f" (on file since {since[:10]})" if since else ""
             quote = f': "{notes}"' if notes else ""
             if vendor_confirmed:
-                detail = f"Called {pretty_phone(called)}{since_text}. Vendor AP confirmed the change{quote}"
-                headline = f"Vendor AP at the number on file confirmed the change{quote}"
+                detail = f"Called {pretty_phone(called)}{since_text}. They confirmed the change{quote}"
+                headline = f"At the number on file, they confirmed the change{quote}"
                 decision, risk = "PAY", 0.1
                 if not original["bank_account_new"]:
                     # The vendor confirmed a change but the message carried no account number to pay:
@@ -178,8 +178,8 @@ class Doris:
                         self.vendors.update_field(original["vendor_id"], "routing_last4", new_routing,
                                                   at=now, source=f"callback confirmed by {pretty_phone(called)}" + (f": {notes}" if notes else ""))
             else:
-                detail = f"Called {pretty_phone(called)}{since_text}. Vendor AP said{quote}" if notes else f"Called {pretty_phone(called)}{since_text}. Vendor AP did not confirm the change"
-                headline = f"Vendor AP at the number on file said{quote}" if notes else "Vendor AP at the number on file did not confirm the change"
+                detail = f"Called {pretty_phone(called)}{since_text}. They said{quote}" if notes else f"Called {pretty_phone(called)}{since_text}. They did not confirm the change"
+                headline = f"At the number on file, they said{quote}" if notes else "At the number on file, they did not confirm the change"
                 decision, risk = "BLOCKED", 0.99
             result = Signal("callback_result", True, "gate", detail, {"vendor_confirmed": vendor_confirmed, "called": called, "notes": notes})
             signals = [s for s in original["signals"] if s["name"] != "callback_result"] + [result.to_dict()]

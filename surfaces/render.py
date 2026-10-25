@@ -18,7 +18,7 @@ TAGLINE = "Doris only trusts what's on file."
 VERDICT = {
     "PAY": ("Paid", "pay", "Doris approved this payment."),
     "HOLD": ("On hold", "hold", "Waiting for a person to review it. No money moves."),
-    "CALLBACK": ("Calling the vendor", "callback", "Doris is verifying by phone at the number on file. No money moves."),
+    "CALLBACK": ("Calling to verify", "callback", "Doris is verifying by phone at the number on file. No money moves."),
     "BLOCKED": ("Blocked", "blocked", "No money moves."),
 }
 SIGNAL_LABEL = {
@@ -182,7 +182,7 @@ def summary(d: dict) -> str:
     changed = d.get("bank_account_new") and d.get("bank_account_new") != d.get("bank_account_on_file")
     rows = [
         ("Claims to be", d.get("vendor_claimed") or "Unknown"),
-        ("Vendor on file", d.get("vendor_id") or "None (first-time vendor)"),
+        ("Record on file", d.get("vendor_id") or "None: nothing on file for this sender"),
         ("Pay to", d.get("payee_name") or "Not found"),
         ("Amount", None),
         ("Sender", d.get("sender_email") or d.get("sender_domain") or "Unknown"),
@@ -533,7 +533,8 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
                     f'<td>{pill(d.get("decision", ""))}</td><td>{float(d.get("risk_score") or 0):.2f}</td></tr>')
     status = '<span class="ok">Detector connected</span>' if detector_ok else '<span class="bad">Detector not reachable</span>'
     demo_form = ('<form class="inline" method="post" action="/demo/send"><button class="primary">Send the demo bank-change email</button>'
-                 '<span class="quiet">Runs the live demo email through Doris and opens its screen.</span></form>'
+                 '<button formaction="/demo/send?scenario=payroll">Send the payroll direct-deposit email</button>'
+                 '<span class="quiet">Runs a demo email through Doris and opens its screen.</span></form>'
                  '<p class="quiet" style="margin:8px 0 0"><a href="/?live=1">Live mode</a>: this page opens each new decision the moment it arrives.</p>') if demo else ""
     door = ""
     if stats:

@@ -5,10 +5,10 @@ Submit by Sun 2026-10-25, 9 AM PT, at the venue (be there by 8). Submission text
 
 ## The pitch
 
-Doris is an AI accounts-payable clerk that stops the most expensive email in business: "we changed our bank
-account, please pay us here." She never judges how convincing the email is; she checks it against what's on file,
-then phones the vendor at the number she's had for at least 90 days. "We never changed our bank" blocks the payment
-on screen in real time. Full version in [README.md](README.md).
+Never verify a request through the channel it came in on. Doris applies that rule deepest to accounts payable ("we
+changed our bank account"), checking every request against what's on file and phoning the vendor at the number she's
+had for 90+ days; the same engine handles an employee's direct-deposit change. Payroll, wires, closings and helpdesk
+resets are the same attack, and Doris is the same answer. Full version in [README.md](README.md).
 
 ## State (2026-10-25, 03:45)
 
@@ -19,7 +19,8 @@ on screen in real time. Full version in [README.md](README.md).
 | Callback: Twilio + Cartesia voice, disclosure, yes-twice + last-payment check | Done; live | three real calls: voicemail held, spoken "no" and keypad "2" both flipped to BLOCKED |
 | Shared desk on SpacetimeDB | Done; live | the queue jumped and the screen flipped from the desk's push |
 | Forward-to-check door | Built and tested, not deployed | needs a domain and Postmark |
-| Tests | 374 pass | `.venv/bin/pytest -q` |
+| Second scenario: payroll direct-deposit change | Done; same engine | `surfaces/tests/test_payroll.py` |
+| Tests | 379 pass | `.venv/bin/pytest -q` |
 | Test sets (offline) | 14/15 and 12/12 frauds stopped; 0 of 20 legitimate invoices blocked | `python -m detector --offline evaluate` |
 
 ## Run the demo
@@ -35,7 +36,8 @@ DORIS_DB=data/demo_table.db ANTHROPIC_API_KEY=... .venv/bin/python -m detector s
 DORIS_KEYS_FILE=<key file>:<twilio file>:<demo env> .venv/bin/python -m surfaces serve --role demo
 tailscale funnel --bg 8789                                         # only the webhooks are public; off: tailscale funnel --https=443 off
 ```
-Open http://127.0.0.1:8788/?live=1 and press "Send the demo bank-change email". The table phone rings; wait for
+Open http://127.0.0.1:8788/?live=1 and press "Send the demo bank-change email" (or the payroll one; an existing
+demo database gets the employee record with `demo-seed --add`). The table phone rings; wait for
 Doris to finish, say "No, we never changed our bank", and the screen flips to BLOCKED.
 
 ## Left to do (people only)
