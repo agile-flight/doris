@@ -22,8 +22,8 @@ write-up (inspiration, what it does, how we built it, challenges, accomplishment
 **Before you select CRS.** CRS's rule is "make meaningful use of the CRS sandbox and show it working live in your
 demo." So before submitting: fill in your CRS username and password (HANDOFF.md, "CRS credentials"), run
 `DORIS_KEYS_FILE=$HOME/Downloads/doris_crs.env .venv/bin/python -m surfaces crs-check`, restart the dashboard, and press the payroll button once. If a "CRS Fraud
-Finder" line appears in "What Doris did", keep CRS selected, and check that its score and email age match the "risk
-88" and "three days" quoted below (fix the text if not). If it doesn't, set CRS to No and delete the CRS
+Finder" line appears in "What Doris did", keep CRS selected. (Verified live with
+`crs-check` on 2026-10-25: risk 88, high, email first seen ten days ago; the text below quotes those numbers.) If it doesn't, set CRS to No and delete the CRS
 paragraph below.
 
 Devpost needs: an image of the project, the public GitHub link (https://github.com/agile-flight/doris), and a demo
@@ -82,7 +82,7 @@ never verify a request through the channel it came in on, and CRS lets her test 
 source. When an employee's "please update my direct deposit" arrives from a personal address, Doris sends CRS Fraud
 Finder (AtData) the email and origin IP the request came from, together with the name, phone and home address payroll
 already has on file, and asks whether that email belongs to that person. In the live demo CRS answers risk 88 of 100:
-an address first seen three days ago that doesn't match the person on file. The answer goes into "What Doris did" on the
+an address CRS first saw only ten days ago, whose name and address don't match the person on file. The answer goes into "What Doris did" on the
 review screen and onto the shared desk, and a high CRS risk (above 60 of 100, CRS's own "high" label) means Doris won't pay out even after a yes on the
 call: a person has to release it. Responsible with data: Doris sends only the fields the check needs, only CRS
 sandbox persona data, never a real person's details; she logs in once and never retries a failed login, and the
@@ -120,7 +120,7 @@ Before you start: open http://127.0.0.1:8788/?live=1 in one window.
 6. **1:55-2:15, same engine, different victim, checked by CRS.** Back to the queue; click "Send the payroll
    direct-deposit email." "An employee's 'please update my direct deposit' from a personal address. Same engine,
    untouched: Doris calls the phone payroll already had. And she asks CRS whether that email even belongs to this
-   person." Point at the CRS Fraud Finder line: "risk 88 of 100, an address first seen three days ago. Even a yes
+   person." Point at the CRS Fraud Finder line: "risk 88 of 100, an address first seen ten days ago that doesn't match her name or address. Even a yes
    on the call won't pay this out; a person has to release it." (Let the phone ring or decline it; the point is the
    CALLBACK screen with the CRS result.) This step is what CRS judges from, so keep it in the cut.
 7. **2:15-2:30, the close.** "A yes needs the last payment on file, so even a hijacked line with a cloned voice

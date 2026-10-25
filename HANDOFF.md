@@ -21,7 +21,7 @@ resets are the same attack, and Doris is the same answer. Full version in [READM
 | Forward-to-check door | Built and tested, not deployed | needs a domain and Postmark |
 | Second scenario: payroll direct-deposit change | Done; same engine | `surfaces/tests/test_payroll.py` |
 | Payments through Capital One Nessie (sandbox) | Done; live | a clean invoice was paid: transfer recorded in the trace |
-| CRS Fraud Finder on a person's request (sandbox) | Built (765318c), tested offline against a fake CRS; not yet run against the real sandbox | your credentials, `crs-check`, then the payroll button |
+| CRS Fraud Finder on a person's request (sandbox) | Built (765318c); sign-in and Fraud Finder verified live with `crs-check` (P13 risk 88, high; P01 risk 11, low) | your credentials, `crs-check`, then the payroll button |
 | UI: Krish's Bootstrap redo, unified with the demo | Done | all surfaces tests pass on it |
 | Tests | 379 pass | `.venv/bin/pytest -q` |
 | Test sets (offline) | 14/15 and 12/12 frauds stopped; 0 of 20 legitimate invoices blocked | `python -m detector --offline evaluate` |
@@ -59,8 +59,8 @@ Doris to finish, say "No, we never changed our bank", and the screen flips to BL
    (`data/demo_table.db`) already has the CRS employee record, Kayla Brennan; a fresh one needs `demo-seed --add` once.
 4. Press "Send the payroll direct-deposit email": "What Doris did" and the shared desk show the CRS Fraud Finder
    result. These are trace events, not part of the detector's hash-chained audit record.
-5. The docs quote risk 88 and an email three days old, from CRS's published persona expectations. If the screen shows
-   other numbers, change them in SUBMISSION.md and DEVPOST_PASTE.md before you paste.
+5. The docs quote the live result: risk 88 of 100, an email CRS first saw ten days ago (2026-10-15), and no match
+   with the person on file for name, street, city and zip. CRS caches identical requests, so the video shows the same.
 
 ## Left to do (people only)
 

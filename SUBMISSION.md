@@ -56,7 +56,7 @@ harder to fool, not easier.
 - **Works for people as well as companies**: the same engine, unchanged, checks an employee's direct-deposit change
   against their record on file and calls the phone payroll already had.
 - **Checks the channel itself with CRS**: for a person's request, Doris sends CRS Fraud Finder the email and origin
-  IP it came from plus the name, phone and address on file. A high CRS risk (the demo's email is three days old)
+  IP it came from plus the name, phone and address on file. A high CRS risk (the demo's email is ten days old and doesn't match her name or address)
   goes into "What Doris did" on screen, and keeps the money from moving even after a yes on the call.
 - **Is audit-ready**: every decision is a record in a hash chain; the dashboard recomputes every hash itself
   and exports an audit packet with a Python snippet anyone can run to check it.
@@ -132,7 +132,7 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie
   source. When an employee's "please update my direct deposit" arrives from a personal address, Doris sends CRS Fraud
   Finder (AtData) the email and origin IP the request came from, together with the name, phone and home address payroll
   already has on file, and asks whether that email belongs to that person. In the live demo CRS answers risk 88 of 100:
-  an address first seen three days ago that doesn't match the person on file. The answer goes into "What Doris did" on the
+  an address CRS first saw only ten days ago, whose name and address don't match the person on file. The answer goes into "What Doris did" on the
   review screen and onto the shared desk, and a high CRS risk (above 60 of 100, CRS's own "high" label) means Doris won't pay out even after a yes on the
   call: a person has to release it. Responsible with data: Doris sends only the fields the check needs, only CRS
   sandbox persona data, never a real person's details; she logs in once and never retries a failed login, and the
@@ -173,7 +173,7 @@ Hand a judge the phone that's on file for Acme Supply before you start. Keep the
    needs the last payment on file." Open the audit record: "The dashboard recomputes every hash itself."
    Fifteen seconds, the platform moment: press "Send the payroll direct-deposit email." "Same engine, untouched: an
    employee's 'update my direct deposit' from a personal email. Doris calls the phone payroll already had, and CRS
-   tells her that email was first seen three days ago, so even a yes on the call won't pay it out." 
+   tells her that email was first seen ten days ago and doesn't match her name or address, so even a yes on the call won't pay it out." 
 5. **Proof and close, 30 s (Creativity).** "14 of 15 frauds stopped, zero real vendors blocked; three adversarial
    reviews, 41 gaps fixed. The more convincing scams get, the less it matters to Doris, because she never judges how
    convincing anything is. Payroll, wires, closings and helpdesk resets are the same attack, and Doris is the same
