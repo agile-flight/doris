@@ -21,7 +21,7 @@ resets are the same attack, and Doris is the same answer. Full version in [READM
 | Forward-to-check door | Built and tested, not deployed | needs a domain and Postmark |
 | Second scenario: payroll direct-deposit change | Done; same engine | `surfaces/tests/test_payroll.py` |
 | Payments through Capital One Nessie (sandbox) | Done; live | a clean invoice was paid: transfer recorded in the trace |
-| CRS Fraud Finder on a person's request (sandbox) | Being built 08:15; needs your credentials | `python -m surfaces crs-check`, then the payroll button |
+| CRS Fraud Finder on a person's request (sandbox) | Built (765318c), tested offline against a fake CRS; not yet run against the real sandbox | your credentials, `crs-check`, then the payroll button |
 | UI: Krish's Bootstrap redo, unified with the demo | Done | all surfaces tests pass on it |
 | Tests | 379 pass | `.venv/bin/pytest -q` |
 | Test sets (offline) | 14/15 and 12/12 frauds stopped; 0 of 20 legitimate invoices blocked | `python -m detector --offline evaluate` |
@@ -49,13 +49,18 @@ Doris to finish, say "No, we never changed our bank", and the screen flips to BL
 1. Open `~/Downloads/doris_crs.env` (outside the repo, readable only by you). It has two blank lines:
    `CRS_USERNAME=` and `CRS_PASSWORD=`. Type your CRS sandbox username and password after the `=` signs, with no
    quotes and no spaces, and save. Never paste them into the repo, a chat or a commit.
-2. Check them once: `DORIS_KEYS_FILE=$HOME/Downloads/doris_crs.env .venv/bin/python -m surfaces crs-check`. It logs in a single time and runs two CRS sandbox
-   personas, including P13; it prints the risk scores, never the credentials. If it says the login failed, fix the file before
+2. Check them once, from the repo folder:
+   `DORIS_KEYS_FILE=$HOME/Downloads/doris_crs.env .venv/bin/python -m surfaces crs-check`.
+   It logs in a single time, then runs CRS sandbox persona P13 (the payroll demo, expected high risk) and P01 (a
+   low-risk control). It prints the risk scores, email age and any no-match fields, never the credentials. If it says the login failed, fix the file before
    trying again: repeated failed logins lock the sandbox account.
 3. Restart the dashboard with the CRS file on the key list (`:~/Downloads/doris_crs.env` at the end of
-   `DORIS_KEYS_FILE`; the doris-surfaces launch entry already includes it). If the demo database predates the CRS
-   employee record, run `demo-seed --add` once.
-4. Press "Send the payroll direct-deposit email": "What Doris did" shows the CRS Fraud Finder result.
+   `DORIS_KEYS_FILE`; the doris-surfaces launch entry already includes it). The demo database
+   (`data/demo_table.db`) already has the CRS employee record, Kayla Brennan; a fresh one needs `demo-seed --add` once.
+4. Press "Send the payroll direct-deposit email": "What Doris did" and the shared desk show the CRS Fraud Finder
+   result. These are trace events, not part of the detector's hash-chained audit record.
+5. The docs quote risk 88 and an email three days old, from CRS's published persona expectations. If the screen shows
+   other numbers, change them in SUBMISSION.md and DEVPOST_PASTE.md before you paste.
 
 ## Left to do (people only)
 

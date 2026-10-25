@@ -22,7 +22,8 @@ write-up (inspiration, what it does, how we built it, challenges, accomplishment
 **Before you select CRS.** CRS's rule is "make meaningful use of the CRS sandbox and show it working live in your
 demo." So before submitting: fill in your CRS username and password (HANDOFF.md, "CRS credentials"), run
 `DORIS_KEYS_FILE=$HOME/Downloads/doris_crs.env .venv/bin/python -m surfaces crs-check`, restart the dashboard, and press the payroll button once. If a "CRS Fraud
-Finder" line appears in "What Doris did", keep CRS selected. If it doesn't, set CRS to No and delete the CRS
+Finder" line appears in "What Doris did", keep CRS selected, and check that its score and email age match the "risk
+88" and "three days" quoted below (fix the text if not). If it doesn't, set CRS to No and delete the CRS
 paragraph below.
 
 Devpost needs: an image of the project, the public GitHub link (https://github.com/agile-flight/doris), and a demo
