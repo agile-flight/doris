@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import base64
 import json
+import socket
+import ssl
 import logging
 import re
 import secrets
@@ -234,17 +236,25 @@ class CallManager:
         auth = base64.b64encode(f"{user}:{secret}".encode()).decode()
         req = urllib.request.Request(f"https://api.twilio.com/2010-04-01/Accounts/{s.twilio_account_sid}/Calls.json", data=form,
                                      method="POST", headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"})
-        try:
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as e:
+        for attempt in range(3):
             try:
-                msg = json.loads(e.read()).get("message") or e.reason
-            except ValueError:
-                msg = e.reason
-            raise TelephonyError(f"Twilio refused the call: {msg}") from None
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            raise TelephonyError(f"Twilio not reachable: {e}") from None
+                with urllib.request.urlopen(req, timeout=20) as resp:
+                    return json.loads(resp.read())
+            except urllib.error.HTTPError as e:
+                try:
+                    msg = json.loads(e.read()).get("message") or e.reason
+                except ValueError:
+                    msg = e.reason
+                raise TelephonyError(f"Twilio refused the call: {msg}") from None
+            except (urllib.error.URLError, OSError, ValueError) as e:
+                # Retry only when the request never reached Twilio (a dropped connection or TLS handshake), so a
+                # retry can't place a second call. Anything later is reported, not retried.
+                reason = getattr(e, "reason", e)
+                never_sent = isinstance(reason, (ssl.SSLError, ConnectionError, socket.gaierror)) or "handshake" in str(e).lower()
+                if attempt < 2 and never_sent:
+                    time.sleep(1.5)
+                    continue
+                raise TelephonyError(f"Twilio not reachable: {e}") from None
 
     # --- TwiML ----------------------------------------------------------------------
 

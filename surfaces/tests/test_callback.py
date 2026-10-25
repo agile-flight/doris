@@ -219,3 +219,28 @@ def test_demo_seed_puts_the_table_phone_on_file(tmp_path):
     bad = subprocess.run([sys.executable, "-m", "surfaces", "demo-seed", "--phone", "415-555", "--db", str(tmp_path / "x.db")],
                          cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
     assert bad.returncode != 0 and "E.164" in bad.stderr
+
+
+
+def test_a_dropped_connection_to_twilio_is_retried(tmp_path, monkeypatch):
+    import ssl
+    import urllib.error
+    from surfaces.config import Settings
+    from surfaces.app import Surfaces
+    app = Surfaces(Settings(data_dir=tmp_path, twilio_account_sid="AC" + "0" * 32, twilio_auth_token="t" * 32, twilio_from="+15005550001"))
+    m = callback.CallManager(app)
+    tries = []
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"sid": "CA1", "status": "queued"}'
+
+    def flaky(req, timeout=0):
+        tries.append(1)
+        if len(tries) < 3:
+            raise urllib.error.URLError(ssl.SSLError("The handshake operation timed out"))
+        return Resp()
+    monkeypatch.setattr(callback.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(callback.time, "sleep", lambda s: None)
+    assert m._twilio_create(to="+15005550006", url="https://x/y", status_url="https://x/s")["sid"] == "CA1" and len(tries) == 3
