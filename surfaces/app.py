@@ -53,7 +53,7 @@ class Surfaces:
                 "resolved-elsewhere": "Already resolved.", "stale": "The last call never reported back. Try again.",
                 "superseded": "Replaced by a newer call."}.get(call["status"], call["status"])
         if call.get("result"):
-            text += f" Vendor said: {call['result']}."
+            text += f" Vendor said: {call['result'].rstrip('.!? ')}."
         return text
 
     def maybe_auto_call(self, decision: dict) -> None:

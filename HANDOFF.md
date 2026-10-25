@@ -99,7 +99,9 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 
 ## Still to do
 - [x] Agent B: screens, live dashboard, callback, door, adversarial review (308 tests pass).
-- [ ] First real call: claim the Twilio number, `python -m surfaces demo-seed --phone <table phone>`, expose port 8789 (`tailscale funnel 8789`), dry-run per `surfaces/README.md`.
+- [x] First real call (2026-10-25, 02:40): Doris called from (831) 609-9968 (Manish's Twilio, full account) through Tailscale Funnel;
+  the vendor said "We haven't changed our bank account" and the screen flipped to BLOCKED by itself. An earlier call that
+  reached voicemail was treated as no answer: payment held, nothing blocked.
 - [ ] First real email: domain + Postmark inbound for check@ and the AP inbox, each with its own secret webhook.
 - [ ] Bounty: run it as its own sandbox per `BOUNTY.md` (separate detector, database, capped key, `--role bounty`), then post the rules there.
 - [x] Live Claude run: 5/5 fixtures correct. It found two bugs, now fixed: the extraction schema was rejected
