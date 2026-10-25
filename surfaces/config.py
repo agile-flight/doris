@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
-         "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN"}
+         "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY"}
 
 
 def load_key_files(paths: Optional[str]) -> dict[str, str]:

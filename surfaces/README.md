@@ -35,8 +35,9 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 2. Seed a demo database whose Acme record rings that phone (on file since 2021):
    `.venv/bin/python -m surfaces demo-seed --phone +1XXXXXXXXXX`, then run the detector with
    `DORIS_DB=data/demo.db .venv/bin/python -m detector serve`.
-3. Expose only the hooks port: `tailscale funnel 8789` (Funnel must be enabled for your tailnet), and set
-   `DORIS_PUBLIC_URL` to the `https://….ts.net` address it prints.
+3. Expose only the hooks port: `tailscale funnel --bg 8789` (Funnel must be enabled for your tailnet), and put
+   `DORIS_PUBLIC_URL=https://….ts.net` (the address it prints) in a private file outside the repo, listed in `DORIS_KEYS_FILE`.
+   Turn it off after the demo with `tailscale funnel --https=443 off`.
 4. `TWILIO_FROM=+1… DORIS_AUTO_CALL=1 DORIS_PUBLIC_URL=https://… DORIS_KEYS_FILE=… .venv/bin/python -m surfaces serve`
 5. Dry run (the doc's check): open `/?live=1`, press "Send the demo bank-change email", answer the phone,
    wait for Doris to finish asking (she ignores anything said while she talks), and say "we never changed our bank".
