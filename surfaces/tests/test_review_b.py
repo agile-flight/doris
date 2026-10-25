@@ -239,7 +239,7 @@ def test_12_an_answer_that_cannot_be_saved_says_so(wired):
     http("POST", f"{wired.hooks_url}/twilio/{token}/gather", {"Digits": "2"})
     time.sleep(0.5)
     assert wired.store.call(token)["status"] == "unsaved"
-    assert "couldn" in wired.call_text(first) and "pressed 2" in wired.call_text(first)
+    assert "couldn" in wired.call_text(first) and "No (pressed 2)" in wired.call_text(first)
 
 
 # 13 -----------------------------------------------------------------------------

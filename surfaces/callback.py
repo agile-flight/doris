@@ -306,7 +306,8 @@ class CallManager:
             self._say(call, token, script["verify_failed"])
             return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
         outcome = classify(speech, digits[:1] if digits else "")
-        said = speech or (f"pressed {digits}" if digits else "")
+        word = {"1": "Yes", "2": "No"}.get(digits[:1], "") if digits else ""
+        said = speech or (f"{word} (pressed {digits[:1]})" if word else f"pressed {digits}" if digits else "")
         if outcome == "confirmed" and call.get("stage") != "confirming":
             self.app.store.update_call(token, stage="confirming", notes=said)
             self._say(call, token, script["confirm"])
