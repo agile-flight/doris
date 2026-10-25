@@ -20,7 +20,7 @@ TABLE_PHONE = "+15005550006"
 
 @pytest.fixture
 def demo_stack(tmp_path):
-    """A detector on a demo-seeded database (Acme and Kayla Brennan on file since 2021), and wired surfaces."""
+    """A detector on a demo-seeded database (Tannerfield and Kayla Brennan on file since 2021), and wired surfaces."""
     db = tmp_path / "demo.db"
     env = {**os.environ, "DORIS_OFFLINE": "1"}
     env.pop("ANTHROPIC_API_KEY", None)
@@ -94,7 +94,7 @@ def test_doris_asks_the_employee_and_a_no_keeps_their_pay(demo_stack):
 def test_the_vendor_scenario_still_speaks_to_a_company(demo_stack):
     _, _, first = send(demo_stack, "vendor")
     d = json.loads(urllib.request.urlopen(f"{demo_stack.client.base}/decisions/{first}", timeout=10).read())
-    assert d["vendor_id"] == "ven_acme_supply"
+    assert d["vendor_id"] == "ven_tannerfield_supply" and d["sender_domain"] == "tannerfieldsupply-billing.com"
     s = callback.lines(d, "Cal Hacks Robotics")
     assert "did your company change its bank account" in s["prompt"] and "accounts payable" in s["prompt"]
 
@@ -116,3 +116,28 @@ def test_demo_seed_add_keeps_existing_records(tmp_path):
     assert run().returncode == 0
     again = run("--add")
     assert again.returncode == 0 and "Added any missing demo records" in again.stdout
+
+
+def test_demo_fresh_archives_everything_and_seeds_a_clean_database(tmp_path):
+    from surfaces.demo import fresh_demo
+    db = tmp_path / "demo_table.db"
+    env = {**os.environ, "DORIS_OFFLINE": "1"}
+    first = subprocess.run([sys.executable, "-m", "surfaces", "demo-seed", "--phone", TABLE_PHONE, "--db", str(db)],
+                           cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+    assert first.returncode == 0, first.stderr
+    surf = tmp_path / "surf"
+    surf.mkdir()
+    (surf / "surfaces.db").write_text("old calls")
+    (surf / "crs.json").write_text("{}")
+    (surf / "audio").mkdir()
+    out = fresh_demo(TABLE_PHONE, str(db), surf)
+    archived = next((tmp_path / "archive").iterdir())
+    assert (archived / "detector" / "demo_table.db").exists() and (archived / "surfaces" / "surfaces.db").read_text() == "old calls"
+    assert db.exists() and not (surf / "surfaces.db").exists() and (surf / "audio").exists(), "the voice cache stays"
+    assert "restart" in out.lower()
+
+
+def test_a_routine_invoice_from_the_demo_vendor_is_paid(demo_stack):
+    _, _, first = send(demo_stack, "routine")
+    d = json.loads(urllib.request.urlopen(f"{demo_stack.client.base}/decisions/{first}", timeout=10).read())
+    assert d["vendor_id"] == "ven_tannerfield_supply" and d["decision"] == "PAY" and d["bank_account_new"] in (None, "****1234")

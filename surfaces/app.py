@@ -24,7 +24,8 @@ from .store import Store
 log = logging.getLogger("doris.surfaces")
 SAMPLES_DIR = ROOT / "contract" / "samples"
 DEMO_EMAIL = Path(__file__).resolve().parent / "demo" / "bank_change_demo.eml"
-DEMO_EMAILS = {"vendor": DEMO_EMAIL, "payroll": Path(__file__).resolve().parent / "demo" / "payroll_change_demo.eml"}
+DEMO_EMAILS = {"vendor": Path(__file__).resolve().parent / "demo" / "vendor_bank_change.eml",
+               "routine": Path(__file__).resolve().parent / "demo" / "routine_invoice.eml", "payroll": Path(__file__).resolve().parent / "demo" / "payroll_change_demo.eml"}
 
 
 class Surfaces:
@@ -231,12 +232,22 @@ class DashboardHandler(_Base):
         call = self.app.store.latest_call(decision_id)
         return bool(call and call["status"] in LIVE)
 
+    def _has_vendor(self, vendor_id: str) -> bool:
+        try:
+            return bool(self.app.client.vendor(vendor_id))
+        except DetectorError:
+            return False
+
     def _post(self):
         path = urlparse(self.path).path.rstrip("/")
         form = _form(self)
         if path == "/demo/send":
             scenario = (parse_qs(urlparse(self.path).query).get("scenario") or ["vendor"])[0]
-            raw = DEMO_EMAILS.get(scenario, DEMO_EMAIL).read_bytes()
+            path = DEMO_EMAILS.get(scenario, DEMO_EMAIL)
+            if scenario != "payroll" and not self._has_vendor("ven_tannerfield_supply"):
+                # a detector on the plain test fixtures: their supplier, under its fixture name
+                path = DEMO_EMAIL if scenario != "routine" else ROOT / "detector" / "fixtures" / "emails" / "clean_acme.eml"
+            raw = path.read_bytes()
             decision = self.app.client.check_raw(raw)
             from . import crs
             crs.after_check(self.app, decision, raw)

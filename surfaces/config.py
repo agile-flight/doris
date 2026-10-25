@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
          "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY",
          "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN", "NESSIE_API_KEY", "NESSIE_URL",
-         "CRS_USERNAME", "CRS_PASSWORD", "CRS_URL"}
+         "CRS_USERNAME", "CRS_PASSWORD", "CRS_URL", "DORIS_DEMO_PHONE"}
 
 
 def load_key_files(paths: Optional[str]) -> dict[str, str]:
@@ -68,7 +68,7 @@ class Settings:
     cartesia_voice: str = "d1d9c946-7cfc-4378-85a4-07d09827cb7e"   # Jolene: honeyed Southern, i.e. Doris
     cartesia_model: str = "sonic-3"
     auto_call: bool = False       # dial as soon as a CALLBACK decision arrives
-    company: str = "Cal Hacks Robotics"
+    company: str = "Marlowe Robotics"
     inbound_token: str = ""       # secret path segment for the inbound email webhook
     postmark_token: str = ""      # outbound replies; empty = write replies to data/surfaces/outbox
     door_from: str = ""
@@ -91,6 +91,7 @@ class Settings:
     crs_username: str = ""        # CRS Credit API sandbox: the user's own sign-in, from their key file
     crs_password: str = field(default="", repr=False)
     crs_url: str = "https://api-sandbox.stitchcredit.com/api"
+    demo_phone: str = ""          # the phone on file in the demo (demo-fresh), from the private key file
     extra: dict = field(default_factory=dict)
 
     @property
@@ -125,6 +126,7 @@ class Settings:
         s.crs_username = env.get("CRS_USERNAME", "")
         s.crs_password = env.get("CRS_PASSWORD", "")
         s.crs_url = env.get("CRS_URL", s.crs_url)
+        s.demo_phone = env.get("DORIS_DEMO_PHONE", "")
         s.door_auth = env.get("DORIS_DOOR_AUTH", s.door_auth)
         s.door_daily = int(env.get("DORIS_DOOR_DAILY", s.door_daily))
         s.door_concurrency = int(env.get("DORIS_DOOR_CONCURRENCY", s.door_concurrency))
