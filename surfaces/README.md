@@ -18,6 +18,7 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 | Variable | What |
 |---|---|
 | `DORIS_KEYS_FILE` | key files outside the repo, separated by `:` (later ones win): `NAME=value` lines, or loose labels picked out by shape |
+| `NESSIE_API_KEY` | Capital One Nessie sandbox: PAY decisions are paid there once; BLOCKED records that nothing was sent |
 | `TWILIO_AUTH_TOKEN` | with `TWILIO_ACCOUNT_SID`, authenticates calls (instead of an API key and secret) |
 | `DORIS_DETECTOR_URL` | default `http://127.0.0.1:8787` |
 | `TWILIO_FROM` | the Twilio number Doris calls from (E.164) |

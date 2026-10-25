@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
          "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY",
-         "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN"}
+         "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN", "NESSIE_API_KEY", "NESSIE_URL"}
 
 
 def load_key_files(paths: Optional[str]) -> dict[str, str]:
@@ -85,6 +85,8 @@ class Settings:
     spacetime_url: str = ""       # e.g. http://127.0.0.1:3000: the shared desk; empty = screens poll on their own
     spacetime_db: str = "doris"
     spacetime_token: str = ""     # the publishing identity's token: only Doris may write to the desk
+    nessie_key: str = ""          # Capital One Nessie sandbox: when set, PAY decisions are paid there
+    nessie_url: str = "https://api.nessieisreal.com"
     extra: dict = field(default_factory=dict)
 
     @property
@@ -114,6 +116,8 @@ class Settings:
         s.spacetime_url = env.get("DORIS_SPACETIME_URL", "").rstrip("/")
         s.spacetime_db = env.get("DORIS_SPACETIME_DB", s.spacetime_db)
         s.spacetime_token = env.get("SPACETIME_TOKEN", "")
+        s.nessie_key = env.get("NESSIE_API_KEY", "")
+        s.nessie_url = env.get("NESSIE_URL", s.nessie_url)
         s.door_auth = env.get("DORIS_DOOR_AUTH", s.door_auth)
         s.door_daily = int(env.get("DORIS_DOOR_DAILY", s.door_daily))
         s.door_concurrency = int(env.get("DORIS_DOOR_CONCURRENCY", s.door_concurrency))

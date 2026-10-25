@@ -104,7 +104,7 @@ vendor's own mailbox is compromised.
 
 ## Built with
 
-python, claude, anthropic-api, cartesia, twilio, spacetimedb, typescript, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
+python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie, typescript, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
 
 ## Sponsor tracks (one paragraph each, in the description or the track field)
 
@@ -123,6 +123,9 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, typescript, sqlite
   a callback is mirrored into it, and every open dashboard subscribes, so when the vendor says "we never changed our
   bank" every screen on that invoice flips at once and the team sees who's watching. Only Doris's identity can write;
   the TypeScript module enforces it.
+- **Capital One: Best Use of Nessie.** Doris moves the money herself: when a decision ends in PAY she sends the payment
+  through the Nessie sandbox, once, and the receipt ("Paid through Capital One: $4,820.00 to Acme Supply Co., transfer
+  2d1d5f39") lands in the live trace and on the shared desk; a BLOCKED decision records that nothing was sent.
 - **Cartesia: Best Use of Cartesia.** Doris's voice is Cartesia sonic-3 (the Jolene voice), rendered as telephone
   audio and cached per line; it's the whole verification step, not a garnish.
 - **Armadin: Best Security Hack.** Three adversarial reviews and a 38-attack replay suite; lookalike, homoglyph,

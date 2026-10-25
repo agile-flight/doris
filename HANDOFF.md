@@ -20,6 +20,8 @@ resets are the same attack, and Doris is the same answer. Full version in [READM
 | Shared desk on SpacetimeDB | Done; live | the queue jumped and the screen flipped from the desk's push |
 | Forward-to-check door | Built and tested, not deployed | needs a domain and Postmark |
 | Second scenario: payroll direct-deposit change | Done; same engine | `surfaces/tests/test_payroll.py` |
+| Payments through Capital One Nessie (sandbox) | Done; live | a clean invoice was paid: transfer recorded in the trace |
+| UI: Krish's Bootstrap redo, unified with the demo | Done | all surfaces tests pass on it |
 | Tests | 379 pass | `.venv/bin/pytest -q` |
 | Test sets (offline) | 14/15 and 12/12 frauds stopped; 0 of 20 legitimate invoices blocked | `python -m detector --offline evaluate` |
 
