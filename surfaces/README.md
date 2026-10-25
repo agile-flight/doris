@@ -17,7 +17,8 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 
 | Variable | What |
 |---|---|
-| `DORIS_KEYS_FILE` | text file outside the repo with the Anthropic, Twilio and Cartesia keys (picked out by shape) |
+| `DORIS_KEYS_FILE` | key files outside the repo, separated by `:` (later ones win): `NAME=value` lines, or loose labels picked out by shape |
+| `TWILIO_AUTH_TOKEN` | with `TWILIO_ACCOUNT_SID`, authenticates calls (instead of an API key and secret) |
 | `DORIS_DETECTOR_URL` | default `http://127.0.0.1:8787` |
 | `TWILIO_FROM` | the Twilio number Doris calls from (E.164) |
 | `DORIS_PUBLIC_URL` | public HTTPS address of the hooks port (8789), for Twilio and inbound mail |

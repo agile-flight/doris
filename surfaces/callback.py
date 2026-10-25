@@ -207,7 +207,8 @@ class CallManager:
         form = urllib.parse.urlencode([("To", to), ("From", s.twilio_from), ("Url", url), ("Method", "POST"),
                                        ("StatusCallback", status_url), ("StatusCallbackMethod", "POST"), ("Timeout", "25"),
                                        *[("StatusCallbackEvent", e) for e in ("initiated", "ringing", "answered", "completed")]]).encode()
-        auth = base64.b64encode(f"{s.twilio_api_key}:{s.twilio_api_secret}".encode()).decode()
+        user, secret = (s.twilio_account_sid, s.twilio_auth_token) if s.twilio_auth_token else (s.twilio_api_key, s.twilio_api_secret)
+        auth = base64.b64encode(f"{user}:{secret}".encode()).decode()
         req = urllib.request.Request(f"https://api.twilio.com/2010-04-01/Accounts/{s.twilio_account_sid}/Calls.json", data=form,
                                      method="POST", headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"})
         try:

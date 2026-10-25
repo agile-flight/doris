@@ -11,11 +11,26 @@ from typing import Optional
 ROOT = Path(__file__).resolve().parent.parent
 
 
+KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
+         "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN"}
+
+
+def load_key_files(paths: Optional[str]) -> dict[str, str]:
+    """Several key files separated by ':' or ','; a later file overrides an earlier one."""
+    out: dict[str, str] = {}
+    for path in re.split(r"[:,]", paths or ""):
+        out.update(load_key_file(path.strip()))
+    return out
+
+
 def load_key_file(path: Optional[str]) -> dict[str, str]:
-    """Pick credentials out of a loosely labelled text file by their shapes."""
-    if not path or not Path(path).is_file():
+    """Credentials from a text file: NAME=value lines win; otherwise keys are picked out of loose labels by their shapes."""
+    if not path or not Path(path).expanduser().is_file():
         return {}
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    text = Path(path).expanduser().read_text(encoding="utf-8", errors="replace")
+    named = {m.group(1): m.group(2).strip() for m in re.finditer(r"^\s*([A-Z_]+)\s*=\s*(\S+)\s*$", text, re.MULTILINE) if m.group(1) in KNOWN}
+    if named:
+        return named
     found: dict[str, str] = {}
     for name, pattern in (("ANTHROPIC_API_KEY", r"sk-ant-[A-Za-z0-9_\-]+"), ("TWILIO_ACCOUNT_SID", r"\bAC[0-9a-f]{32}\b"),
                           ("TWILIO_API_KEY", r"\bSK[0-9a-f]{32}\b"), ("CARTESIA_API_KEY", r"sk_car_[A-Za-z0-9]+")):
@@ -45,6 +60,7 @@ class Settings:
     twilio_account_sid: str = ""
     twilio_api_key: str = ""
     twilio_api_secret: str = ""
+    twilio_auth_token: str = ""   # Account SID + auth token also authenticates (and is all some accounts hand out)
     twilio_from: str = ""         # the Twilio number Doris calls from (E.164)
     cartesia_api_key: str = ""
     cartesia_voice: str = "d1d9c946-7cfc-4378-85a4-07d09827cb7e"   # Jolene: honeyed Southern, i.e. Doris
@@ -69,11 +85,12 @@ class Settings:
 
     @property
     def twilio_ready(self) -> bool:
-        return all([self.twilio_account_sid, self.twilio_api_key, self.twilio_api_secret, self.twilio_from, self.public_base_url])
+        has_auth = bool(self.twilio_auth_token) or bool(self.twilio_api_key and self.twilio_api_secret)
+        return all([self.twilio_account_sid, has_auth, self.twilio_from, self.public_base_url])
 
     @classmethod
     def from_env(cls, **overrides) -> "Settings":
-        env = {**load_key_file(os.environ.get("DORIS_KEYS_FILE")), **os.environ}
+        env = {**load_key_files(os.environ.get("DORIS_KEYS_FILE")), **os.environ}
         s = cls(
             detector_url=env.get("DORIS_DETECTOR_URL", cls.detector_url).rstrip("/"),
             port=int(env.get("DORIS_SURFACES_PORT", cls.port)),
@@ -82,6 +99,7 @@ class Settings:
             data_dir=Path(env["DORIS_SURFACES_DATA"]) if env.get("DORIS_SURFACES_DATA") else cls.data_dir,
             twilio_account_sid=env.get("TWILIO_ACCOUNT_SID", ""), twilio_api_key=env.get("TWILIO_API_KEY", ""),
             twilio_api_secret=env.get("TWILIO_API_SECRET", ""), twilio_from=env.get("TWILIO_FROM", ""),
+            twilio_auth_token=env.get("TWILIO_AUTH_TOKEN", ""),
             cartesia_api_key=env.get("CARTESIA_API_KEY", ""),
             cartesia_voice=env.get("CARTESIA_VOICE", cls.cartesia_voice), cartesia_model=env.get("CARTESIA_MODEL", cls.cartesia_model),
             auto_call=_bool(env.get("DORIS_AUTO_CALL")), company=env.get("DORIS_COMPANY", cls.company),
