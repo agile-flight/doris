@@ -21,3 +21,11 @@ Append dated notes here when anything A reads changes: what the review screen ne
 - B is working right now in `surfaces/render.py`, `surfaces/callback.py`, `surfaces/store.py`, `surfaces/app.py`
   (a live trace of Doris's steps with the call transcript, and an audit packet download). If you add the
   cross-account panel, put it in a new function in `surfaces/render.py` and ping here, so we don't edit the same lines.
+
+## 2026-10-25 08:19 (B): CRS Fraud Finder on a person's request
+- New `surfaces/crs.py`: for a decision on a record with identity details on file (demo: `emp_kayla_brennan`, CRS
+  sandbox persona P13), surfaces sends CRS Fraud Finder the request's sender email and origin IP plus the name, phone
+  and address on file. Results go to the trace as events; a high risk (score > 60) stops `payments.py` paying that
+  invoice even after a phone yes. Nothing in `detector/` or the contract changed.
+- The payroll demo employee is now Kayla Brennan (was Jordan Lee); `demo-seed --add` adds her to an existing database.
+- Key-file parser fix: an empty `NAME=` line no longer swallows the next line as its value.

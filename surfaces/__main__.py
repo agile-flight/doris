@@ -21,6 +21,7 @@ def main(argv=None) -> int:
     p.add_argument("--phone", required=True, help="E.164 number of the phone on the judges' table, e.g. +14155550123")
     p.add_argument("--db", default="data/demo.db", help="detector database to seed (use the same DORIS_DB for serve)")
     p.add_argument("--add", action="store_true", help="add missing demo records to an existing database")
+    sub.add_parser("crs-check", help="sign in to the CRS sandbox with your key file and run two test personas")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(name)s: %(message)s")
     settings = Settings.from_env()
@@ -32,6 +33,9 @@ def main(argv=None) -> int:
         from .demo import seed_demo
         print(seed_demo(args.phone, args.db, add=args.add))
         return 0
+    if args.cmd == "crs-check":
+        from .crs import selftest
+        return selftest(settings)
     if args.cmd == "serve":
         if getattr(args, "role", None):
             settings.role = args.role
@@ -44,6 +48,8 @@ def main(argv=None) -> int:
         door.wire(app)
         from . import desk, payments, render
         if settings.role in ("demo", "all"):
+            from . import crs
+            crs.wire(app)
             payments.wire(app)
         if desk.wire(app):
             render.DESK_CONFIG = app.desk.browser_config()

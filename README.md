@@ -36,8 +36,8 @@ the person on file. Payroll, wires, closings and helpdesk resets are the same at
    For a person rather than a company (an employee's direct-deposit change), the same call asks "did you ask to
    change your direct deposit?" 
 6. **The independent check (CRS)**: for a person's request, Doris sends CRS Fraud Finder (AtData) the email and
-   origin IP it came from, with the name, phone and address on file. A high risk goes on screen and into the
-   record, and a payment it flags waits for a person even after a yes on the call. Only CRS sandbox personas are sent.
+   origin IP it came from, with the name, phone and address on file. A high risk goes into "What Doris did" on
+   screen, and a payment it flags waits for a person even after a yes on the call. Only CRS sandbox personas are sent.
 7. **The record**: every decision is a link in a hash chain. The screen shows a live timeline of what Doris did,
    with the call transcript, and exports an audit packet anyone can verify with five lines of Python.
 

@@ -86,6 +86,13 @@ class Payments:
                 continue
             if d.get("decision") != "PAY":
                 continue
+            checker = getattr(self.app, "crs", None)
+            flag = checker.flagged(d.get("invoice_id")) if checker else None
+            if flag:
+                self._done.add(did)
+                self.app.store.add_event(did, "system", f"Not paid: CRS rated the email behind this request high risk "
+                                                        f"({flag.get('score')} of 100). A person has to release it.")
+                continue
             try:
                 self.pay(d)
                 self._done.add(did)

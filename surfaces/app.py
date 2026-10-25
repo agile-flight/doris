@@ -236,7 +236,10 @@ class DashboardHandler(_Base):
         form = _form(self)
         if path == "/demo/send":
             scenario = (parse_qs(urlparse(self.path).query).get("scenario") or ["vendor"])[0]
-            decision = self.app.client.check_raw(DEMO_EMAILS.get(scenario, DEMO_EMAIL).read_bytes())
+            raw = DEMO_EMAILS.get(scenario, DEMO_EMAIL).read_bytes()
+            decision = self.app.client.check_raw(raw)
+            from . import crs
+            crs.after_check(self.app, decision, raw)
             self.app.maybe_auto_call(decision)
             return self.redirect(f"/d/{quote(decision['decision_id'])}")
         m = re.fullmatch(r"/d/([^/]+)/(review|manual_callback|call)", path)

@@ -57,7 +57,7 @@ harder to fool, not easier.
   against their record on file and calls the phone payroll already had.
 - **Checks the channel itself with CRS**: for a person's request, Doris sends CRS Fraud Finder the email and origin
   IP it came from plus the name, phone and address on file. A high CRS risk (the demo's email is three days old)
-  goes on screen and into the audit trail, and keeps the money from moving even after a yes on the call.
+  goes into "What Doris did" on screen, and keeps the money from moving even after a yes on the call.
 - **Is audit-ready**: every decision is a record in a hash chain; the dashboard recomputes every hash itself
   and exports an audit packet with a Python snippet anyone can run to check it.
 
@@ -132,8 +132,8 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, capital-one-nessie
   source. When an employee's "please update my direct deposit" arrives from a personal address, Doris sends CRS Fraud
   Finder (AtData) the email and origin IP the request came from, together with the name, phone and home address payroll
   already has on file, and asks whether that email belongs to that person. In the live demo CRS answers risk 88 of 100:
-  an address first seen three days ago that doesn't match the person on file. The answer goes on the review screen and
-  into the hash-chained audit trail, and a high CRS risk (above 60 of 100, CRS's own "high" label) means Doris won't pay out even after a yes on the
+  an address first seen three days ago that doesn't match the person on file. The answer goes into "What Doris did" on the
+  review screen and onto the shared desk, and a high CRS risk (above 60 of 100, CRS's own "high" label) means Doris won't pay out even after a yes on the
   call: a person has to release it. Responsible with data: Doris sends only the fields the check needs, only CRS
   sandbox persona data, never a real person's details; she logs in once and never retries a failed login, and the
   credentials live in a private file outside the repo.

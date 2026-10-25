@@ -259,6 +259,8 @@ class Door:
             self._running.release()
         if mode == "ap":
             self.app.store.set_verdict(token, "ap", decision["decision_id"])
+            from . import crs
+            crs.after_check(self.app, decision, raw)
             self.app.maybe_auto_call(decision)
             return f"ap: {decision['decision']}"
         v = verdict(decision)

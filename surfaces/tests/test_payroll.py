@@ -20,7 +20,7 @@ TABLE_PHONE = "+15005550006"
 
 @pytest.fixture
 def demo_stack(tmp_path):
-    """A detector on a demo-seeded database (Acme and Jordan Lee on file since 2021), and wired surfaces."""
+    """A detector on a demo-seeded database (Acme and Kayla Brennan on file since 2021), and wired surfaces."""
     db = tmp_path / "demo.db"
     env = {**os.environ, "DORIS_OFFLINE": "1"}
     env.pop("ANTHROPIC_API_KEY", None)
@@ -67,8 +67,8 @@ def test_payroll_change_is_checked_against_the_employee_on_file(demo_stack):
     status, html, first = send(demo_stack, "payroll")
     assert status == 200 and "Calling to verify" in html
     d = json.loads(urllib.request.urlopen(f"{demo_stack.client.base}/decisions/{first}", timeout=10).read())
-    assert d["decision"] == "CALLBACK" and d["vendor_id"] == "emp_jordan_lee" and d["callback_number"] == TABLE_PHONE
-    assert d["sender_domain"] == "gmail.com" and d["bank_account_new"] == "****9930" and d["bank_account_on_file"] == "****4417"
+    assert d["decision"] == "CALLBACK" and d["vendor_id"] == "emp_kayla_brennan" and d["callback_number"] == TABLE_PHONE
+    assert d["sender_domain"] == "example.com" and d["bank_account_new"] == "****9930" and d["bank_account_on_file"] == "****4417"
     fired = {s["name"] for s in d["signals"] if s["fired"]}
     assert {"bank_account_changed", "urgency_language"} <= fired
 

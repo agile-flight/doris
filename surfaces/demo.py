@@ -15,10 +15,11 @@ E164 = re.compile(r"\+[1-9][0-9]{6,14}")
 
 
 # The same rule covers people as well as companies: an employee's direct-deposit change is checked against their
-# record on file and verified by calling the phone HR already had. Ids starting "emp_" are people.
+# record on file and verified by calling the phone HR already had. Ids starting "emp_" are people. Kayla is CRS sandbox
+# persona P13, so the CRS check (surfaces/crs.py) gets the sandbox's canned answer for her.
 EMPLOYEE = {
-    "vendor_id": "emp_jordan_lee", "name": "Jordan Lee", "domain": "calhacksrobotics.com",
-    "email": "jordan.lee@calhacksrobotics.com", "contact_name": "Jordan Lee", "bank_last4": "4417", "routing_last4": "0358",
+    "vendor_id": "emp_kayla_brennan", "name": "Kayla Brennan", "domain": "calhacksrobotics.com",
+    "email": "kayla.brennan@calhacksrobotics.com", "contact_name": "Kayla Brennan", "bank_last4": "4417", "routing_last4": "0358",
     "since": "2021-06-01T16:00:00Z",
     "payments": [{"amount": 3184.62, "paid_at": f"2026-{m:02d}-{d:02d}T16:00:00Z", "invoice_id": f"PAYROLL-2026-{m:02d}{d:02d}"}
                  for m, d in ((8, 14), (8, 28), (9, 11), (9, 25), (10, 9))],
@@ -48,5 +49,5 @@ def seed_demo(phone: str, db: str, add: bool = False) -> str:
         raise SystemExit(f"detector seed failed: {done.stderr.strip()[-300:]}")
     if add:
         return f"Added any missing demo records to {db_path} (records already there are left as they are)."
-    return (f"Seeded {db_path} (Acme's and Jordan Lee's phone on file since 2021 is {phone[:2]}…{phone[-4:]}).\n"
+    return (f"Seeded {db_path} (Acme's and Kayla Brennan's phone on file since 2021 is {phone[:2]}…{phone[-4:]}).\n"
             f"Start the detector on it with: DORIS_DB={db_path} .venv/bin/python -m detector serve")

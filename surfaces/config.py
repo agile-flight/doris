@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
          "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY",
-         "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN", "NESSIE_API_KEY", "NESSIE_URL"}
+         "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN", "NESSIE_API_KEY", "NESSIE_URL",
+         "CRS_USERNAME", "CRS_PASSWORD", "CRS_URL"}
 
 
 def load_key_files(paths: Optional[str]) -> dict[str, str]:
@@ -29,7 +30,7 @@ def load_key_file(path: Optional[str]) -> dict[str, str]:
     if not path or not Path(path).expanduser().is_file():
         return {}
     text = Path(path).expanduser().read_text(encoding="utf-8", errors="replace")
-    named = {m.group(1): m.group(2).strip() for m in re.finditer(r"^\s*([A-Z_]+)\s*=\s*(\S+)\s*$", text, re.MULTILINE) if m.group(1) in KNOWN}
+    named = {m.group(1): m.group(2).strip() for m in re.finditer(r"^[ \t]*([A-Z_]+)[ \t]*=[ \t]*(\S+)[ \t]*$", text, re.MULTILINE) if m.group(1) in KNOWN}
     if named:
         return named
     found: dict[str, str] = {}
@@ -87,6 +88,9 @@ class Settings:
     spacetime_token: str = ""     # the publishing identity's token: only Doris may write to the desk
     nessie_key: str = ""          # Capital One Nessie sandbox: when set, PAY decisions are paid there
     nessie_url: str = "https://api.nessieisreal.com"
+    crs_username: str = ""        # CRS Credit API sandbox: the user's own sign-in, from their key file
+    crs_password: str = field(default="", repr=False)
+    crs_url: str = "https://api-sandbox.stitchcredit.com/api"
     extra: dict = field(default_factory=dict)
 
     @property
@@ -118,6 +122,9 @@ class Settings:
         s.spacetime_token = env.get("SPACETIME_TOKEN", "")
         s.nessie_key = env.get("NESSIE_API_KEY", "")
         s.nessie_url = env.get("NESSIE_URL", s.nessie_url)
+        s.crs_username = env.get("CRS_USERNAME", "")
+        s.crs_password = env.get("CRS_PASSWORD", "")
+        s.crs_url = env.get("CRS_URL", s.crs_url)
         s.door_auth = env.get("DORIS_DOOR_AUTH", s.door_auth)
         s.door_daily = int(env.get("DORIS_DOOR_DAILY", s.door_daily))
         s.door_concurrency = int(env.get("DORIS_DOOR_CONCURRENCY", s.door_concurrency))
