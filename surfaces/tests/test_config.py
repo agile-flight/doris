@@ -4,9 +4,9 @@ from surfaces.config import Settings, load_key_file, load_key_files
 
 def test_named_lines_win(tmp_path):
     f = tmp_path / "k.txt"
-    f.write_text("TWILIO_ACCOUNT_SID=AC" + "1" * 32 + "\nTWILIO_AUTH_TOKEN=" + "a" * 32 + "\nTWILIO_FROM=+18316099968\nNOT_A_KEY=x\n")
+    f.write_text("TWILIO_ACCOUNT_SID=AC" + "1" * 32 + "\nTWILIO_AUTH_TOKEN=" + "a" * 32 + "\nTWILIO_FROM=+15005550006\nNOT_A_KEY=x\n")
     got = load_key_file(str(f))
-    assert got == {"TWILIO_ACCOUNT_SID": "AC" + "1" * 32, "TWILIO_AUTH_TOKEN": "a" * 32, "TWILIO_FROM": "+18316099968"}
+    assert got == {"TWILIO_ACCOUNT_SID": "AC" + "1" * 32, "TWILIO_AUTH_TOKEN": "a" * 32, "TWILIO_FROM": "+15005550006"}
 
 
 def test_loose_labels_still_work(tmp_path):
@@ -19,7 +19,7 @@ def test_loose_labels_still_work(tmp_path):
 def test_later_files_override_earlier(tmp_path, monkeypatch):
     a, b = tmp_path / "a.txt", tmp_path / "b.txt"
     a.write_text("sk-ant-api03-abc\nTwilio api key SK" + "0" * 32 + "\n")
-    b.write_text("TWILIO_ACCOUNT_SID=AC" + "2" * 32 + "\nTWILIO_AUTH_TOKEN=" + "c" * 32 + "\nTWILIO_FROM=+18316099968\n")
+    b.write_text("TWILIO_ACCOUNT_SID=AC" + "2" * 32 + "\nTWILIO_AUTH_TOKEN=" + "c" * 32 + "\nTWILIO_FROM=+15005550006\n")
     merged = load_key_files(f"{a}:{b}")
     assert merged["ANTHROPIC_API_KEY"] == "sk-ant-api03-abc" and merged["TWILIO_ACCOUNT_SID"] == "AC" + "2" * 32
     monkeypatch.setenv("DORIS_KEYS_FILE", f"{a}:{b}")
@@ -27,7 +27,7 @@ def test_later_files_override_earlier(tmp_path, monkeypatch):
     for k in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM", "TWILIO_API_KEY", "TWILIO_API_SECRET"):
         monkeypatch.delenv(k, raising=False)
     s = Settings.from_env()
-    assert s.twilio_ready and s.twilio_auth_token == "c" * 32 and s.twilio_from == "+18316099968"
+    assert s.twilio_ready and s.twilio_auth_token == "c" * 32 and s.twilio_from == "+15005550006"
 
 
 def test_auth_token_is_used_for_the_call(monkeypatch):

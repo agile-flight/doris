@@ -3,6 +3,16 @@
 Paste each section into the matching Devpost field. Numbers are as of 2026-10-25, 03:00; re-run the commands
 under "Proof" if anything changes before submitting.
 
+## The pitch in one paragraph
+
+Doris is an AI accounts-payable clerk that stops the most expensive email in business: "we changed our bank account,
+please pay us here." She never judges how convincing the email is; she checks it against what's on file, runs eight
+checks (a changed account, a lookalike domain, a certificate issued days ago, hidden text telling an AI to approve
+it) and has Claude judge the story. Then she phones the vendor in her own voice at the number she's had for at least
+90 days. "We never changed our bank" blocks the payment on screen the moment it's said, and a yes needs the last
+payment on file, so a hijacked line with a cloned voice still can't release money. Every step is a tamper-evident
+record, every screen updates live, and on our test sets she stopped 26 of 27 frauds without blocking one real vendor.
+
 ## Tagline (one line)
 
 Doris only trusts what's on file: an AI accounts-payable clerk that stops "we changed our bank account" fraud and
@@ -94,7 +104,8 @@ python, claude, anthropic-api, cartesia, twilio, spacetimedb, typescript, sqlite
   assume a swarm of agents attacking it.
 - **Anthropic: Claude for Public Benefit.** This fraud drains small businesses, nonprofits, schools and local
   governments (Clark County lost $182,000 to one fake LLC). Claude reads each invoice and judges whether its story
-  matches a known fraud script; a free forward-to-check address lets anyone ask Doris about a suspicious email.
+  matches a known fraud script. The same engine powers a forward-to-check door anyone could email a suspicious
+  message to (built and tested; it goes live once the domain and mail service are set up).
 - **Spacetime: Best Use of Spacetime.** Doris's AP desk is a SpacetimeDB database: every decision and every line of
   a callback is mirrored into it, and every open dashboard subscribes, so when the vendor says "we never changed our
   bank" every screen on that invoice flips at once and the team sees who's watching. Only Doris's identity can write;

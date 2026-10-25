@@ -1,5 +1,8 @@
 # The $50 "beat Doris" bounty
 
+> **Status: not run at Cal Hacks** (there wasn't time to draw real traffic). The defences it describes are built
+> and tested; this is the plan for opening the forward-to-check door to the public later.
+
 Assume a swarm of capable agents will do its worst. The bounty runs on its own sandbox (its own detector,
 database, audit chain and public address), so nothing it does can touch the demo's queue, live screen or phone.
 

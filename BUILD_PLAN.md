@@ -39,22 +39,7 @@ bank-change fixture to POST /check, display CALLBACK and the trusted number,
 then submit a negative callback result to show the superseding BLOCKED decision.
 The review screen uses ct_timeline; GET /evaluation exposes matrix results.
 
-## Verified state — October 23, 2026
+## Verified state
 
-211 tests and the 26-test contract check pass. All 20 adversarial-review findings are
-closed (see HANDOFF.md). Offline evaluation stops 14/15 fraud cases; 10/12 legitimate
-cases PAY, one HOLD and one CALLBACK. No legitimate case is BLOCKED. The missed fraud
-case is fraud_iban_soft_language.
-
-The DOJ-derived set (`detector/testset/cases_doj.json`) is in: 12 reconstructions of
-publicly reported DOJ/IC3 BEC typologies plus 8 legitimate controls. Offline it stops
-12/12 fraud cases, blocks no legitimate invoice outright, and pays 6/8 legitimate ones
-(the other two are the by-design frictions: a genuine bank change is CALLBACK, a
-first-time vendor is HOLD). Because it is a reconstruction set, the catch rate is an
-upper bound, not a field estimate:
-`python -m detector --offline evaluate --testset detector/testset/cases_doj.json`.
-
-Agent B implementation is still pending. Live Claude calls have not been tested.
-
-Next: complete Agent B's surfaces, validate a live model configuration only with a
-deliberate API budget, and rehearse the demo.
+The current state, proof and known limits are in [HANDOFF.md](HANDOFF.md) (both halves built, live calls
+verified, 374 tests). The October 23 snapshot that used to be here is kept in [docs/HISTORY.md](docs/HISTORY.md).

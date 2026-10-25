@@ -31,7 +31,8 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 
 ## The live demo, once
 
-1. Claim a Twilio number and verify the judges'-table phone (trial accounts only call verified numbers).
+1. Have a Twilio number with voice. A trial account can only call verified numbers and plays a trial notice; a full
+   account can call the table phone directly.
 2. Seed a demo database whose Acme record rings that phone (on file since 2021):
    `.venv/bin/python -m surfaces demo-seed --phone +1XXXXXXXXXX`, then run the detector with
    `DORIS_DB=data/demo.db .venv/bin/python -m detector serve`.

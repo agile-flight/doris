@@ -29,8 +29,8 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 
 The last command stays running at http://127.0.0.1:8787. These commands use no
 Claude API credit. Each laptop runs its own backend and seeded fixture database.
-For a live model run, supply your own ANTHROPIC_API_KEY and a supported DORIS_MODEL;
-the existing default model/live path has not been verified. Do not commit keys.
+For a live model run, supply your own ANTHROPIC_API_KEY; the default model (claude-opus-5-5)
+was verified live on 2026-10-25 (5/5 fixtures, about 8 seconds a check). Do not commit keys.
 
 ## Both people: sync each finished slice
 
