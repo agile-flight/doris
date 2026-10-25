@@ -73,6 +73,9 @@ class CRS:
                 raise CRSError(self._login_failed)
             if not self._user or not self._pass:
                 raise CRSError("CRS credentials are missing: put CRS_USERNAME and CRS_PASSWORD in your key file")
+            if any(re.match(r"[A-Z_]+=", v) for v in (self._user, self._pass)):
+                # a misread key file (a value that is really the next "NAME=" line): refuse rather than risk a lockout
+                raise CRSError("The CRS key file looks misread (a value starts with NAME=). Not logging in; check the file.")
             try:
                 status, data = self._request("/users/login", {"username": self._user, "password": self._pass}, None)
             except (urllib.error.URLError, OSError, ValueError) as exc:

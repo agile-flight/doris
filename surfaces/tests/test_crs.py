@@ -171,3 +171,16 @@ def test_the_payroll_button_puts_the_crs_answer_in_what_doris_did(demo_stack):
     assert sent and sent[0]["email"] == "kb.9921x@example.com" and sent[0]["ipAddress"] == "198.51.100.13"
     page = urllib.request.urlopen(f"{demo_stack.dash_url}/d/{first}", timeout=10).read().decode()
     assert "risk 88 of 100, high" in page and "p@ss" not in page
+
+
+def test_a_misread_key_file_never_reaches_the_login(tmp_path):
+    fake = FakeCRS()
+    for user, pw in (("CRS_PASSWORD=", "x"), ("u", "CRS_USERNAME=u"), ("", "p"), ("u", "")):
+        c = crs.CRS(user, pw, fake.url)
+        try:
+            c.token()
+            raise AssertionError("should refuse")
+        except crs.CRSError:
+            pass
+    assert fake.logins() == 0
+    assert crs.CRS("u", "p@ss", fake.url).token() == "tok1", "a real password may contain = or @"
