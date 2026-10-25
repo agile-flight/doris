@@ -14,7 +14,7 @@ write-up (inspiration, what it does, how we built it, challenges, accomplishment
 | Yes | Armadin: Best Security Hack | Prompt-injection, lookalike and cloned-voice defences; three adversarial reviews. |
 | Yes | Microsoft: Built for the Real World | Real calls, measured false positives. |
 | Yes | Cal Hacks overall, Most Technically Complex, Best People-First Social Impact | Opt in if Devpost lists them. |
-| Only if it shipped | Capital One: Best Use of Nessie | Only if the Nessie payment integration is in the repo before you submit. |
+| Yes | Capital One: Best Use of Nessie | Shipped: approved invoices are paid as Nessie sandbox transfers (verified live). |
 | No | Atlassian: Best Agent / Security for Agents | Their rules require a Forge app inside Jira or Confluence; Doris isn't one. |
 | No | CRS: Best Use of CRS API | Not integrated. |
 | No | MLH: Best Domain from GoDaddy Registry | Needs a registered domain; we don't have one. |
@@ -70,7 +70,7 @@ holds anything it can't read instead of guessing, and never blocks a real vendor
 to absorb it: small businesses, nonprofits, and employees whose pay gets diverted. Doris protects them with one rule
 anyone can understand: never trust the channel a request came in on.
 
-**Capital One: Best Use of Nessie** *(only if it shipped)*. When Doris approves a payment, it is paid as a real
+**Capital One: Best Use of Nessie.** When Doris approves a payment, it is paid as a real
 transfer in Capital One's Nessie sandbox, and a blocked one never is: Doris is autonomous all the way to the money.
 
 ## Project image
