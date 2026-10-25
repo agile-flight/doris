@@ -24,5 +24,7 @@ leaves, then verifies by calling the number already on file.
 - Verification only ever uses data already on file, never anything in the incoming message.
 - "On file" means unchanged for 90 days. A contact changed more recently is never used for the callback.
 - A new vendor's first payment is always HOLD (human review). A vendor edit raises the score and logs; only a bank change forces the callback.
-- Prompt injection is evidence: hidden or AI-addressed text scores maximum risk.
+- Prompt injection is evidence: hidden PDF text, hidden HTML that carries instructions, or AI-addressed text blocks the payment.
+- On the call, Doris says she's automated, asks for no account details, and never reads out a number. A denial blocks;
+  a yes moves money only when repeated and backed by the last payment on file; anything unclear holds for a person.
 - Do not store email bodies after the check; store hashes and extracted fields.

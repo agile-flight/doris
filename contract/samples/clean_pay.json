@@ -108,7 +108,7 @@
       "name": "new_vendor",
       "fired": false,
       "weight": "gate",
-      "detail": "Vendor on file since 2021"
+      "detail": "On file since 2021"
     },
     {
       "name": "llm_judgment",
@@ -173,5 +173,5 @@
   "decision_id": "dec_ffb70ef54f95",
   "seq": 5,
   "prev_hash": "sha256:2da6ef64353dd758c4f7dcc8189447f4a562dac01e9825a4799166d33a65ff9b",
-  "audit_hash": "sha256:c49b96a116e16a8d93c5dfd002a69ca835d1aa1cf24c9e72cdb574218bf2a63c"
+  "audit_hash": "sha256:96ad16afb83d856d96c5d40a4f5e6031c30fec219f25e2ed2a1daf2ca7ea19c1"
 }

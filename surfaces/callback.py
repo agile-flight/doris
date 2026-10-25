@@ -50,20 +50,43 @@ def spaced(digits: Optional[str]) -> str:
 def lines(decision: dict, company: str) -> dict[str, str]:
     last4 = spaced((decision.get("bank_account_new") or "")[-4:])
     ask = f"ending in {last4}" if last4 else "at a new bank"
+    if str(decision.get("vendor_id") or "").startswith("emp_"):
+        # The same call for a person: an employee's direct-deposit change, checked against the phone HR already had.
+        return {
+            "prompt": (f"Hi, this is Doris, an automated assistant from payroll at {company}. We got an email asking us to send "
+                       f"your pay to a different bank account, {ask}. I won't ask you for any account details. Before we change "
+                       "anything: did you ask to change your direct deposit? Please say yes or no. Or press 1 for yes, 2 for no."),
+            "reprompt": "Sorry, I didn't catch that. Did you ask to change your direct deposit? Say yes or no, or press 1 for yes, 2 for no.",
+            "confirm": (f"Just to be sure: you did ask us to move your pay to the account {ask}? "
+                        "Say yes again, or press 1. If not, say no, or press 2."),
+            "denied": "Thank you. Then that email wasn't from you. Your pay stays where it is, and I'm flagging the request as fraud. Bye now.",
+            "confirmed": "Thanks for confirming. I'll update your direct deposit. Bye now.",
+            "unclear": f"No problem. I'll leave your direct deposit as it is. If you'd like, call payroll on the number you already have for {company}. Goodbye.",
+            "handled": "Thanks for picking up. This one has already been taken care of, so there's nothing you need to do. Bye now.",
+            "verify": ("One last check, so I know it's really you: what was the amount of your last paycheck? You can say it, or type it "
+                       "in whole dollars and press pound. If you'd rather not say, hang up and call payroll on the number you already have "
+                       f"for {company}. Nothing changes until we hear from you."),
+            "verify_failed": f"Thanks. I couldn't match that to our records, so I'll leave your direct deposit as it is. Please call payroll on the number you already have for {company}. Goodbye.",
+        }
     return {
-        "prompt": (f"Hi, this is Doris from accounts payable at {company}. We got an email asking us to send your payments "
-                   f"to a different bank account, {ask}. Before we pay anything: did your company change its bank account? "
+        # Doris says she is automated, and asks for nothing a scammer could misuse: the same rule both ways.
+        "prompt": (f"Hi, this is Doris, an automated assistant from accounts payable at {company}. We got an email asking us "
+                   f"to send your payments to a different bank account, {ask}. I won't ask you for any account details. "
+                   "Before we pay anything: did your company change its bank account? "
                    "Please say yes or no. Or press 1 for yes, 2 for no."),
         "reprompt": "Sorry, hon, I didn't catch that. Did your company change its bank account? Say yes or no, or press 1 for yes, 2 for no.",
         "confirm": (f"Just to be sure, hon: your company did change its bank account, to the one {ask}? "
                     "Say yes again, or press 1. If not, say no, or press 2."),
         "denied": "Thank you. Then that email wasn't from you. I'm stopping the payment right now and flagging it as fraud. Bye now.",
         "confirmed": "Thanks for confirming. I'll update our records and release the payment. Bye now.",
-        "unclear": "No problem. I'll hold the payment and someone from our team will call you back. Goodbye.",
+        "unclear": (f"No problem. I'll hold the payment. If you'd like, call our accounts payable team on the number "
+                    f"you already have for {company}. Goodbye."),
         "handled": "Thanks for picking up. This one has already been taken care of, so there's nothing you need to do. Bye now.",
         "verify": ("One last check, hon, so I know it's really you: what was the amount of the last payment we sent you? "
-                   "You can say it, or type it in whole dollars and press pound."),
-        "verify_failed": "Thanks. I couldn't match that to our records, so I'll hold the payment and someone from our team will follow up. Goodbye.",
+                   "You can say it, or type it in whole dollars and press pound. If you'd rather not say, hang up and call "
+                   f"our accounts payable team on the number you already have for {company}. Nothing gets paid until we hear from you."),
+        "verify_failed": (f"Thanks. I couldn't match that to our records, so I'll hold the payment. Please call our accounts payable "
+                          f"team on the number you already have for {company}. Goodbye."),
     }
 
 
@@ -183,7 +206,17 @@ class CallManager:
             self.app.store.update_call(token, status="failed", notes=str(exc)[:300])
             raise exc if isinstance(exc, TelephonyError) else TelephonyError(f"the call could not be placed: {exc}") from None
         self.app.store.update_call(token, status=result.get("status") or "queued", twilio_sid=result.get("sid"))
+        self._event(decision["decision_id"], "system", f"Dialing {decision['callback_number']}, the number on file, never one from the email", token)
         return token
+
+    def _event(self, decision_id: str, who: str, text: str, token: Optional[str] = None) -> None:
+        try:
+            self.app.store.add_event(decision_id, who, text, token)
+        except Exception:  # noqa: BLE001  (the transcript is a view; it must never break the call)
+            log.exception("could not record a call event")
+
+    def _say(self, call: dict, token: str, line: str) -> None:
+        self._event(call["decision_id"], "doris", line, token)
 
     def _prerender(self, script: dict) -> None:
         for key in ("reprompt", "confirm", "verify", "verify_failed", "denied", "confirmed", "unclear", "handled"):
@@ -197,7 +230,8 @@ class CallManager:
         form = urllib.parse.urlencode([("To", to), ("From", s.twilio_from), ("Url", url), ("Method", "POST"),
                                        ("StatusCallback", status_url), ("StatusCallbackMethod", "POST"), ("Timeout", "25"),
                                        *[("StatusCallbackEvent", e) for e in ("initiated", "ringing", "answered", "completed")]]).encode()
-        auth = base64.b64encode(f"{s.twilio_api_key}:{s.twilio_api_secret}".encode()).decode()
+        user, secret = (s.twilio_account_sid, s.twilio_auth_token) if s.twilio_auth_token else (s.twilio_api_key, s.twilio_api_secret)
+        auth = base64.b64encode(f"{user}:{secret}".encode()).decode()
         req = urllib.request.Request(f"https://api.twilio.com/2010-04-01/Accounts/{s.twilio_account_sid}/Calls.json", data=form,
                                      method="POST", headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"})
         try:
@@ -261,6 +295,8 @@ class CallManager:
             self.app.store.update_call(token, status="resolved-elsewhere")
             return f"<Response>{self._speak(script['handled'])}<Hangup/></Response>"
         self.app.store.update_call(token, status="in-progress")
+        self._event(call["decision_id"], "system", "The vendor picked up", token)
+        self._say(call, token, script["prompt"])
         return f"<Response>{self._gather(token, script['prompt'])}</Response>"
 
     def gather_twiml(self, token: str, form: dict) -> Optional[str]:
@@ -273,6 +309,8 @@ class CallManager:
         script = lines(decision, self.app.settings.company)
         speech = (form.get("SpeechResult") or "").strip()[:200]
         digits = (form.get("Digits") or "").strip()[:12]
+        heard = speech or (f"(pressed {digits})" if digits else "(silence)")
+        self._event(call["decision_id"], "vendor", heard, token)
         if call.get("stage") == "verifying":
             # The records check. A hijacked line or a cloned voice still has to know what only the vendor knows.
             # A miss never blocks a real vendor: it leaves the payment frozen for a person.
@@ -281,31 +319,44 @@ class CallManager:
             if amount is not None and expected is not None and abs(amount - expected) <= 1.0:
                 said = f"{call.get('notes')}; last payment we sent: {answer} (matches the record on file)"
                 self.app.store.update_call(token, status="saving", result=said, stage="confirmed")
+                self._event(call["decision_id"], "system", "That matches the last payment on file", token)
+                self._say(call, token, script["confirmed"])
                 self._post(token, call["decision_id"], "confirmed", said, decision.get("callback_number"))
                 return f"<Response>{self._speak(script['confirmed'])}<Hangup/></Response>"
             said = f"{call.get('notes')}; last payment we sent: {answer} (does not match the record on file)"
             self.app.store.update_call(token, status="inconclusive", result=said, stage="failed-check")
+            self._event(call["decision_id"], "system", "That doesn't match the last payment on file: the payment stays frozen for a person", token)
+            self._say(call, token, script["verify_failed"])
             return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
         outcome = classify(speech, digits[:1] if digits else "")
-        said = speech or (f"pressed {digits}" if digits else "")
+        word = {"1": "Yes", "2": "No"}.get(digits[:1], "") if digits else ""
+        said = speech or (f"{word} (pressed {digits[:1]})" if word else f"pressed {digits}" if digits else "")
         if outcome == "confirmed" and call.get("stage") != "confirming":
             self.app.store.update_call(token, stage="confirming", notes=said)
+            self._say(call, token, script["confirm"])
             return f"<Response>{self._gather(token, script['confirm'])}</Response>"
         if outcome is None:
             if call.get("stage") != "confirming" and call["attempts"] < 1:
                 self.app.store.update_call(token, attempts=call["attempts"] + 1)
+                self._say(call, token, script["reprompt"])
                 return f"<Response>{self._gather(token, script['reprompt'])}</Response>"
             self.app.store.update_call(token, status="inconclusive", notes=said or "no answer")
+            self._event(call["decision_id"], "system", "No clear answer: the payment stays frozen", token)
+            self._say(call, token, script["unclear"])
             return f"<Response>{self._speak(script['unclear'])}<Hangup/></Response>"
         if outcome == "confirmed":
             said = f"{call.get('notes') or 'yes'}; then, asked again: {said}"
             if self._last_payment(decision) is None:
                 self.app.store.update_call(token, status="inconclusive", stage="failed-check",
                                            result=f"{said}; no payment history on file to check against")
+                self._event(call["decision_id"], "system", "No payment history on file to check against: a person decides", token)
+                self._say(call, token, script["verify_failed"])
                 return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
             self.app.store.update_call(token, stage="verifying", notes=said)
+            self._say(call, token, script["verify"])
             return f"<Response>{self._gather(token, script['verify'], amount=True)}</Response>"
         self.app.store.update_call(token, status="saving", result=said or outcome, stage=outcome)
+        self._say(call, token, script[outcome])
         self._post(token, call["decision_id"], outcome, said or outcome, decision.get("callback_number"))
         return f"<Response>{self._speak(script[outcome])}<Hangup/></Response>"
 
@@ -313,8 +364,9 @@ class CallManager:
         """Hand the vendor's answer to the detector; if it is down, keep the answer and keep trying."""
         def attempt() -> bool:
             try:
-                self.app.client.callback_result(decision_id, confirmed=outcome == "confirmed", notes=said, called=called)
+                follow = self.app.client.callback_result(decision_id, confirmed=outcome == "confirmed", notes=said, called=called)
                 self.app.store.update_call(token, status="completed")
+                self._event(decision_id, "system", f"Doris recorded the answer: {(follow or {}).get('decision', 'done')}", token)
                 return True
             except DetectorError as exc:
                 if exc.status in (400, 404, 409):       # resolved by the clerk meanwhile, or refused: stop
@@ -339,6 +391,9 @@ class CallManager:
         status = (form.get("CallStatus") or "").strip()[:20]
         if status and call["status"] in LIVE and not call.get("result"):
             self.app.store.update_call(token, status=status)
+            shown = {"ringing": "Ringing", "busy": "Line busy", "no-answer": "No answer", "failed": "The call failed", "canceled": "Call canceled"}
+            if status in shown:
+                self._event(call["decision_id"], "system", shown[status], token)
         return True
 
 

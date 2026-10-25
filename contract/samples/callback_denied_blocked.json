@@ -55,7 +55,7 @@
   "llm_rationale": null,
   "payee_name": "Acme Supply Co.",
   "reasons": [
-    "Vendor AP at the number on file said: \"we never changed our bank\"",
+    "At the number on file, they said: \"we never changed our bank\"",
     "Bank account change requested: ****1234 to ****8841",
     "Sender domain acmesupply-billing.com is a lookalike of acmesupply.com (label-append)",
     "That domain got its first certificate 2 days ago",
@@ -162,7 +162,7 @@
       "weight": "low-medium"
     },
     {
-      "detail": "Vendor on file since 2021",
+      "detail": "On file since 2021",
       "fired": false,
       "name": "new_vendor",
       "weight": "gate"
@@ -181,7 +181,7 @@
       "name": "callback_result",
       "fired": true,
       "weight": "gate",
-      "detail": "Called +1 415 555 0123 (on file since 2021-03-10). Vendor AP said: \"we never changed our bank\"",
+      "detail": "Called +1 415 555 0123 (on file since 2021-03-10). They said: \"we never changed our bank\"",
       "evidence": {
         "vendor_confirmed": false,
         "called": "+14155550123",
@@ -194,6 +194,6 @@
   "vendor_id": "ven_acme_supply",
   "decision_id": "dec_36f6ccba382d",
   "seq": 14,
-  "prev_hash": "sha256:562f4da5b364ec257ea57ee8cdf039458795ad18ea2a7bea1e8e8b2c5610d6c6",
-  "audit_hash": "sha256:63388090000db057282e070ed5f29520cff5a6e2232fcc62054f0940b712d92c"
+  "prev_hash": "sha256:cd4d78e8fe30b780fe3c0c0b5ef8cf0fac918b9e9fc9e7a9d5e1685cc99a0b2d",
+  "audit_hash": "sha256:3d5a95ad359be26711b00ee10a01fd8be9d02f91507a7972d66aed57a9da2fc5"
 }

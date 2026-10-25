@@ -44,7 +44,7 @@ def check_new_vendor(ctx: CheckContext) -> Signal:
         who = ctx.invoice.vendor_claimed or ctx.message.sender_domain or "this sender"
         return Signal("new_vendor", True, "gate", f"No record on file for {who}; first payment is always human-reviewed")
     since = ctx.vendor.created_at.strftime("%Y")
-    return Signal("new_vendor", False, "gate", f"Vendor on file since {since}")
+    return Signal("new_vendor", False, "gate", f"On file since {since}")
 
 
 SIGNAL_ORDER = [

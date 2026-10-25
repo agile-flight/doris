@@ -33,6 +33,22 @@ def test_script_reads_digits_and_never_speaks_attacker_text():
     assert "a new bank" in callback.lines({"bank_account_new": None}, "X")["prompt"]
 
 
+def test_doris_says_she_is_automated_and_never_asks_for_secrets():
+    s = callback.lines({"bank_account_new": "****8841"}, "Cal Hacks Robotics")
+    assert s["prompt"].startswith("Hi, this is Doris, an automated assistant from accounts payable at Cal Hacks Robotics.")
+    assert "I won't ask you for any account details" in s["prompt"]
+
+
+def test_every_ask_and_every_hold_offers_a_call_back_on_a_number_they_already_have():
+    import re
+    s = callback.lines({"bank_account_new": "****8841"}, "Cal Hacks Robotics")
+    for key in ("verify", "verify_failed", "unclear"):
+        assert "the number you already have for Cal Hacks Robotics" in s[key], key
+    assert "hang up" in s["verify"] and "Nothing gets paid until we hear from you" in s["verify"]
+    for key, line in s.items():
+        assert not re.search(r"\d{3}\D?\d{3}\D?\d{4}", line), f"Doris never gives a number to call ({key})"
+
+
 class FakeVoice(Voice):
     def __init__(self, cache_dir, works=True):
         super().__init__("", "voice", "model", cache_dir)

@@ -17,7 +17,8 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 
 | Variable | What |
 |---|---|
-| `DORIS_KEYS_FILE` | text file outside the repo with the Anthropic, Twilio and Cartesia keys (picked out by shape) |
+| `DORIS_KEYS_FILE` | key files outside the repo, separated by `:` (later ones win): `NAME=value` lines, or loose labels picked out by shape |
+| `TWILIO_AUTH_TOKEN` | with `TWILIO_ACCOUNT_SID`, authenticates calls (instead of an API key and secret) |
 | `DORIS_DETECTOR_URL` | default `http://127.0.0.1:8787` |
 | `TWILIO_FROM` | the Twilio number Doris calls from (E.164) |
 | `DORIS_PUBLIC_URL` | public HTTPS address of the hooks port (8789), for Twilio and inbound mail |
@@ -30,12 +31,14 @@ every contract sample. Without Twilio, record the vendor's answer with the callb
 
 ## The live demo, once
 
-1. Claim a Twilio number and verify the judges'-table phone (trial accounts only call verified numbers).
+1. Have a Twilio number with voice. A trial account can only call verified numbers and plays a trial notice; a full
+   account can call the table phone directly.
 2. Seed a demo database whose Acme record rings that phone (on file since 2021):
    `.venv/bin/python -m surfaces demo-seed --phone +1XXXXXXXXXX`, then run the detector with
    `DORIS_DB=data/demo.db .venv/bin/python -m detector serve`.
-3. Expose only the hooks port: `tailscale funnel 8789` (Funnel must be enabled for your tailnet), and set
-   `DORIS_PUBLIC_URL` to the `https://….ts.net` address it prints.
+3. Expose only the hooks port: `tailscale funnel --bg 8789` (Funnel must be enabled for your tailnet), and put
+   `DORIS_PUBLIC_URL=https://….ts.net` (the address it prints) in a private file outside the repo, listed in `DORIS_KEYS_FILE`.
+   Turn it off after the demo with `tailscale funnel --https=443 off`.
 4. `TWILIO_FROM=+1… DORIS_AUTO_CALL=1 DORIS_PUBLIC_URL=https://… DORIS_KEYS_FILE=… .venv/bin/python -m surfaces serve`
 5. Dry run (the doc's check): open `/?live=1`, press "Send the demo bank-change email", answer the phone,
    wait for Doris to finish asking (she ignores anything said while she talks), and say "we never changed our bank".
@@ -52,6 +55,39 @@ or a stranger asking for a new account or pressing for speed), else "no red flag
 Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen notes at most 1 per sender per hour.
 Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
 Feedback links open a page whose button records the label, so link scanners can't.
+
+## The shared desk (SpacetimeDB)
+
+Every Decision and every line of a callback is mirrored into a SpacetimeDB database, and every open dashboard
+subscribes: when the vendor answers, every screen showing that invoice flips at once, and several clerks (and the
+judges' screen) watch the same queue and the same call live, with a "N watching" count. Only Doris can write (the
+identity that published the module); screens still ask the dashboard for the decision itself, and fall back to a
+1.5-second refresh if the desk is down.
+
+```bash
+spacetime start --listen-addr 127.0.0.1:3000                                   # local only
+cd surfaces/spacetime && spacetime publish --server local -y doris            # module: spacetimedb/src/index.ts
+spacetime login show --token                                                   # put it in a private file as SPACETIME_TOKEN=...
+```
+Then add `DORIS_SPACETIME_URL=http://127.0.0.1:3000` and `SPACETIME_TOKEN=...` to a private file in `DORIS_KEYS_FILE`.
+The browser bundle `surfaces/static/desk.js` is committed; rebuild it after changing `surfaces/spacetime/client/desk.ts`
+with `cd surfaces/spacetime/client && npm install && npm run build` (after `spacetime generate` if the module changed).
+
+## What judges see
+
+- **What Doris did**: under the verdict, a timeline of her steps (email in, invoice read, records compared, checks
+  run, Claude's read, the decision) and then the call, line by line, as it happens: Doris's question, the vendor's
+  answer, the result. New lines appear live; the newest pulses while the call is on.
+- **Audit record**: `/d/<id>/audit` is a printable record of the invoice's decisions, the transcript, and every hash
+  recomputed by the dashboard itself; `/d/<id>/audit.json` downloads the same as an audit packet, with a Python
+  snippet anyone can run to check the hashes.
+
+## Doris applies her own rule in both directions
+
+The vendor shouldn't trust an incoming call either. Doris opens by saying she is an automated assistant, says she
+won't ask for any account details, and asks only yes or no. When she does ask for something (the last-payment
+check), and whenever she holds a payment, she offers a way out: hang up and call our AP team on the number the
+vendor already has for us. She never gives a number to call, because that is exactly what a scammer would do.
 
 ## AI fraud: a hijacked line, a cloned voice, forged documents
 

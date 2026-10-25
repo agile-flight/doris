@@ -14,6 +14,7 @@ class Store:
         self._con = sqlite3.connect(str(path), check_same_thread=False, timeout=5)
         self._con.row_factory = sqlite3.Row
         self._lock = threading.RLock()
+        self.listeners: list = []     # called with each new call event, e.g. to mirror it onto the shared desk
         with self._lock:
             self._con.executescript(
                 "CREATE TABLE IF NOT EXISTS calls (token TEXT PRIMARY KEY, decision_id TEXT NOT NULL, to_number TEXT,"
@@ -23,6 +24,10 @@ class Store:
                 "CREATE TABLE IF NOT EXISTS door_checks (token TEXT PRIMARY KEY, decision_id TEXT, verdict TEXT NOT NULL,"
                 " sender_hash TEXT NOT NULL, created_at REAL NOT NULL, feedback TEXT);"
                 "CREATE INDEX IF NOT EXISTS door_by_sender ON door_checks(sender_hash, created_at);")
+            self._con.executescript(
+                "CREATE TABLE IF NOT EXISTS call_events (id INTEGER PRIMARY KEY AUTOINCREMENT, decision_id TEXT NOT NULL,"
+                " token TEXT, at REAL NOT NULL, who TEXT NOT NULL, text TEXT NOT NULL);"
+                "CREATE INDEX IF NOT EXISTS events_by_decision ON call_events(decision_id, id);")
             cols = {r[1] for r in self._con.execute("PRAGMA table_info(calls)")}
             if "stage" not in cols:
                 self._con.execute("ALTER TABLE calls ADD COLUMN stage TEXT")
@@ -53,6 +58,27 @@ class Store:
         with self._lock:
             row = self._con.execute("SELECT * FROM calls WHERE token = ?", (token,)).fetchone()
         return dict(row) if row else None
+
+    def add_event(self, decision_id: str, who: str, text: str, token: Optional[str] = None) -> None:
+        """One line of what happened on a callback: who is 'doris', 'vendor' or 'system'."""
+        with self._lock:
+            at = time.time()
+            self._con.execute("INSERT INTO call_events (decision_id, token, at, who, text) VALUES (?,?,?,?,?)",
+                              (decision_id, token, at, who, str(text)[:400]))
+            self._con.commit()
+        for listener in list(self.listeners):
+            try:
+                listener(decision_id, who, str(text)[:400], at)
+            except Exception:  # noqa: BLE001  (a mirror must never break the call)
+                pass
+
+    def events(self, decision_ids: list[str]) -> list[dict]:
+        if not decision_ids:
+            return []
+        marks = ",".join("?" * len(decision_ids))
+        with self._lock:
+            rows = self._con.execute(f"SELECT * FROM call_events WHERE decision_id IN ({marks}) ORDER BY id", list(decision_ids)).fetchall()
+        return [dict(r) for r in rows]
 
     def calls_since(self, since: float) -> int:
         with self._lock:

@@ -32,7 +32,7 @@ def test_queue_when_detector_is_down(tmp_path):
 
 def test_demo_email_to_callback_screen_then_manual_denial_flips_to_blocked(surfaces):
     status, html, _, url = http("POST", surfaces.dash_url + "/demo/send")
-    assert status == 200 and "Calling the vendor" in html and "+1 (415) 555-0123" in html
+    assert status == 200 and "Calling to verify" in html and "+1 (415) 555-0123" in html
     first = decision_id_from(url)
     assert esc("Telephony isn't configured") in html
     st = json.loads(http("GET", f"{surfaces.dash_url}/d/{first}/state")[1])
@@ -52,7 +52,7 @@ def test_manual_callback_requires_a_choice(surfaces):
     _, _, _, url = http("POST", surfaces.dash_url + "/demo/send")
     first = decision_id_from(url)
     status, html, _, _ = http("POST", f"{surfaces.dash_url}/d/{first}/manual_callback", {"notes": "x"})
-    assert status == 200 and "Choose what the vendor said" in html and "Calling the vendor" in html
+    assert status == 200 and "Choose what the vendor said" in html and "Calling to verify" in html
 
 
 def test_review_on_a_hold(surfaces, detector):

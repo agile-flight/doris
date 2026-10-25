@@ -24,6 +24,7 @@ from .store import Store
 log = logging.getLogger("doris.surfaces")
 SAMPLES_DIR = ROOT / "contract" / "samples"
 DEMO_EMAIL = Path(__file__).resolve().parent / "demo" / "bank_change_demo.eml"
+DEMO_EMAILS = {"vendor": DEMO_EMAIL, "payroll": Path(__file__).resolve().parent / "demo" / "payroll_change_demo.eml"}
 
 
 class Surfaces:
@@ -53,7 +54,7 @@ class Surfaces:
                 "resolved-elsewhere": "Already resolved.", "stale": "The last call never reported back. Try again.",
                 "superseded": "Replaced by a newer call."}.get(call["status"], call["status"])
         if call.get("result"):
-            text += f" Vendor said: {call['result']}."
+            text += f" Vendor said: {call['result'].rstrip('.!? ')}."
         return text
 
     def maybe_auto_call(self, decision: dict) -> None:
@@ -166,6 +167,9 @@ class DashboardHandler(_Base):
         if path == "/latest/state":
             decisions = self.app.client.list(limit=1)
             return self.json(200, {"latest_id": decisions[0]["decision_id"] if decisions else ""})
+        if path == "/static/desk.js":
+            f = Path(__file__).resolve().parent / "static" / "desk.js"
+            return self.send(200, f.read_bytes(), "application/javascript; charset=utf-8") if f.is_file() else self.send(404, b"", "text/plain")
         if path == "/samples":
             return self.send(200, render.samples_screen([p.stem for p in sorted(SAMPLES_DIR.glob("*.json"))]))
         m = re.fullmatch(r"/samples/([\w\-]+)", path)
@@ -178,8 +182,30 @@ class DashboardHandler(_Base):
         m = re.fullmatch(r"/d/([^/]+)/state", path)
         if m:
             chain, latest = self.app.client.chain(m.group(1))
+            events = self.app.store.events([d["decision_id"] for d in chain])
             return self.json(200, {"decision_id": m.group(1), "latest_id": latest["decision_id"], "decision": latest["decision"],
-                                   "call_text": self.app.call_text(m.group(1))})
+                                   "call_text": self.app.call_text(m.group(1)),
+                                   "trace_count": render.trace_items(chain, events).count("<li ")})
+        m = re.fullmatch(r"/d/([^/]+)/trace", path)
+        if m:
+            chain, latest = self.app.client.chain(m.group(1))
+            events = self.app.store.events([d["decision_id"] for d in chain])
+            return self.send(200, render.trace_items(chain, events, live=self._call_live(latest["decision_id"])))
+        m = re.fullmatch(r"/d/([^/]+)/audit(\.json)?", path)
+        if m:
+            chain, latest = self.app.client.chain(m.group(1))
+            events = self.app.store.events([d["decision_id"] for d in chain])
+            try:
+                verify = self.app.client.verify()
+            except DetectorError:
+                verify = None
+            from .auditview import packet
+            pk = packet(chain, events, verify)
+            if m.group(2):
+                name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(pk["invoice_id"]))[:60]
+                return self.send(200, json.dumps(pk, indent=2, ensure_ascii=False), "application/json; charset=utf-8",
+                                 headers={"Content-Disposition": f'attachment; filename="doris-audit-{name}.json"'})
+            return self.send(200, render.audit_screen(pk))
         m = re.fullmatch(r"/d/([^/]+)", path)
         if m:
             try:
@@ -194,15 +220,23 @@ class DashboardHandler(_Base):
                 audit_ok = bool(self.app.client.verify().get("ok"))
             except DetectorError:
                 audit_ok = None
+            events = self.app.store.events([d["decision_id"] for d in chain])
             return self.send(200, render.review_screen(latest, chain=chain, audit_ok=audit_ok, call_text=self.app.call_text(latest["decision_id"]),
-                                                      can_call=self.app.settings.twilio_ready, flash=flash))
+                                                      can_call=self.app.settings.twilio_ready, flash=flash, events=events,
+                                                      live=self._call_live(latest["decision_id"])))
         self.send(404, render.page("Not found", "<p>Nothing here.</p>"))
+
+    def _call_live(self, decision_id: str) -> bool:
+        from .callback import LIVE
+        call = self.app.store.latest_call(decision_id)
+        return bool(call and call["status"] in LIVE)
 
     def _post(self):
         path = urlparse(self.path).path.rstrip("/")
         form = _form(self)
         if path == "/demo/send":
-            decision = self.app.client.check_raw(DEMO_EMAIL.read_bytes())
+            scenario = (parse_qs(urlparse(self.path).query).get("scenario") or ["vendor"])[0]
+            decision = self.app.client.check_raw(DEMO_EMAILS.get(scenario, DEMO_EMAIL).read_bytes())
             self.app.maybe_auto_call(decision)
             return self.redirect(f"/d/{quote(decision['decision_id'])}")
         m = re.fullmatch(r"/d/([^/]+)/(review|manual_callback|call)", path)
@@ -237,6 +271,7 @@ class DashboardHandler(_Base):
             notes = form.get("notes", "").strip()[:500] or ("confirmed the change" if confirmed == "yes" else "we never changed our bank")
             follow = self.app.client.callback_result(decision_id, confirmed=confirmed == "yes", notes=f"{notes} (recorded by the AP clerk)",
                                                      called=d.get("callback_number"))
+            self.app.store.add_event(decision_id, "system", f"The AP clerk called the number on file and recorded: \"{notes}\"")
             return self.redirect(f"/d/{quote(follow['decision_id'])}")
         if action == "call":
             if self.app.callbacks is None or not self.app.settings.twilio_ready:
