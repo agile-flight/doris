@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 KNOWN = {"ANTHROPIC_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_API_KEY", "TWILIO_API_SECRET", "TWILIO_FROM",
-         "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY"}
+         "CARTESIA_API_KEY", "POSTMARK_SERVER_TOKEN", "DORIS_PUBLIC_URL", "DORIS_AUTO_CALL", "DORIS_DETECTOR_URL", "DORIS_COMPANY",
+         "DORIS_SPACETIME_URL", "DORIS_SPACETIME_DB", "SPACETIME_TOKEN"}
 
 
 def load_key_files(paths: Optional[str]) -> dict[str, str]:
@@ -81,6 +82,9 @@ class Settings:
     max_connections: int = 64     # per server; extra connections are closed at once
     ap_allowed: tuple = ()        # senders whose mail may reach the AP inbox (empty = any verified sender)
     auto_call_cooldown: int = 120 # seconds between automatic calls, so nothing can ring the table in a loop
+    spacetime_url: str = ""       # e.g. http://127.0.0.1:3000: the shared desk; empty = screens poll on their own
+    spacetime_db: str = "doris"
+    spacetime_token: str = ""     # the publishing identity's token: only Doris may write to the desk
     extra: dict = field(default_factory=dict)
 
     @property
@@ -107,6 +111,9 @@ class Settings:
             door_from=env.get("DORIS_DOOR_FROM", ""), bounty_freeze_at=env.get("DORIS_BOUNTY_FREEZE_AT", ""),
         )
         s.role = env.get("DORIS_ROLE", s.role)
+        s.spacetime_url = env.get("DORIS_SPACETIME_URL", "").rstrip("/")
+        s.spacetime_db = env.get("DORIS_SPACETIME_DB", s.spacetime_db)
+        s.spacetime_token = env.get("SPACETIME_TOKEN", "")
         s.door_auth = env.get("DORIS_DOOR_AUTH", s.door_auth)
         s.door_daily = int(env.get("DORIS_DOOR_DAILY", s.door_daily))
         s.door_concurrency = int(env.get("DORIS_DOOR_CONCURRENCY", s.door_concurrency))

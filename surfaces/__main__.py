@@ -41,6 +41,9 @@ def main(argv=None) -> int:
         if settings.role in ("demo", "all"):
             callback.wire(app)
         door.wire(app)
+        from . import desk, render
+        if desk.wire(app):
+            render.DESK_CONFIG = app.desk.browser_config()
         serve_forever(app)
     return 0
 

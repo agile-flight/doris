@@ -1,0 +1,8 @@
+{
+  "name": "doris-desk-client",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": { "build": "esbuild desk.ts --bundle --format=esm --minify --target=es2020 --outfile=../../static/desk.js" },
+  "dependencies": { "spacetimedb": "2.13.*" },
+  "devDependencies": { "esbuild": "^0.24.0" }
+}

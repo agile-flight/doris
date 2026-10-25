@@ -65,7 +65,7 @@ harder to fool, not easier.
   flips to BLOCKED on its own.
 - On our labelled test sets Doris never blocked a legitimate invoice: 14 of 15 frauds stopped (main set) and 12 of
   12 (a DOJ-typology set), with 0 legitimate invoices blocked outright.
-- 365 automated tests, run against a real detector process.
+- 374 automated tests, run against a real detector process.
 
 ## What we learned
 
@@ -81,7 +81,7 @@ vendor's own mailbox is compromised.
 
 ## Built with
 
-python, claude, anthropic-api, cartesia, twilio, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
+python, claude, anthropic-api, cartesia, twilio, spacetimedb, typescript, sqlite, pdfplumber, certificate-transparency, tailscale, claude-code
 
 ## Sponsor tracks (one paragraph each, in the description or the track field)
 
@@ -95,6 +95,10 @@ python, claude, anthropic-api, cartesia, twilio, sqlite, pdfplumber, certificate
 - **Anthropic: Claude for Public Benefit.** This fraud drains small businesses, nonprofits, schools and local
   governments (Clark County lost $182,000 to one fake LLC). Claude reads each invoice and judges whether its story
   matches a known fraud script; a free forward-to-check address lets anyone ask Doris about a suspicious email.
+- **Spacetime: Best Use of Spacetime.** Doris's AP desk is a SpacetimeDB database: every decision and every line of
+  a callback is mirrored into it, and every open dashboard subscribes, so when the vendor says "we never changed our
+  bank" every screen on that invoice flips at once and the team sees who's watching. Only Doris's identity can write;
+  the TypeScript module enforces it.
 - **Cartesia: Best Use of Cartesia.** Doris's voice is Cartesia sonic-3 (the Jolene voice), rendered as telephone
   audio and cached per line; it's the whole verification step, not a garnish.
 - **Armadin: Best Security Hack.** Three adversarial reviews and a 38-attack replay suite; lookalike, homoglyph,

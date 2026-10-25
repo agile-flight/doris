@@ -110,6 +110,12 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 - [ ] Keys stay out of git: keep them in a file outside the repo (or `.env`, which is ignored) and share them with your teammate directly, not through GitHub.
 - [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
 
+## Shared desk on SpacetimeDB (2026-10-25)
+Decisions and call events are mirrored into a local SpacetimeDB database (`surfaces/spacetime`); every dashboard
+subscribes and flips the instant a row lands, with a "N watching" count. Verified live: the queue jumped to a new
+decision and the CALLBACK screen flipped to BLOCKED from the desk's push, with no console errors. Setup in
+`surfaces/README.md`; tests in `surfaces/tests/test_desk.py`.
+
 ## Live trace and audit packet (2026-10-25)
 The review and BLOCKED screens open with "What Doris did": her steps on the invoice, then the call transcript as it
 happens (stored as call events in surfaces' own database). `/d/<id>/audit` and `/d/<id>/audit.json` give a printable

@@ -55,6 +55,23 @@ Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen no
 Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
 Feedback links open a page whose button records the label, so link scanners can't.
 
+## The shared desk (SpacetimeDB)
+
+Every Decision and every line of a callback is mirrored into a SpacetimeDB database, and every open dashboard
+subscribes: when the vendor answers, every screen showing that invoice flips at once, and several clerks (and the
+judges' screen) watch the same queue and the same call live, with a "N watching" count. Only Doris can write (the
+identity that published the module); screens still ask the dashboard for the decision itself, and fall back to a
+1.5-second refresh if the desk is down.
+
+```bash
+spacetime start --listen-addr 127.0.0.1:3000                                   # local only
+cd surfaces/spacetime && spacetime publish --server local -y doris            # module: spacetimedb/src/index.ts
+spacetime login show --token                                                   # put it in a private file as SPACETIME_TOKEN=...
+```
+Then add `DORIS_SPACETIME_URL=http://127.0.0.1:3000` and `SPACETIME_TOKEN=...` to a private file in `DORIS_KEYS_FILE`.
+The browser bundle `surfaces/static/desk.js` is committed; rebuild it after changing `surfaces/spacetime/client/desk.ts`
+with `cd surfaces/spacetime/client && npm install && npm run build` (after `spacetime generate` if the module changed).
+
 ## What judges see
 
 - **What Doris did**: under the verdict, a timeline of her steps (email in, invoice read, records compared, checks

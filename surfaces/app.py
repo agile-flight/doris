@@ -166,6 +166,9 @@ class DashboardHandler(_Base):
         if path == "/latest/state":
             decisions = self.app.client.list(limit=1)
             return self.json(200, {"latest_id": decisions[0]["decision_id"] if decisions else ""})
+        if path == "/static/desk.js":
+            f = Path(__file__).resolve().parent / "static" / "desk.js"
+            return self.send(200, f.read_bytes(), "application/javascript; charset=utf-8") if f.is_file() else self.send(404, b"", "text/plain")
         if path == "/samples":
             return self.send(200, render.samples_screen([p.stem for p in sorted(SAMPLES_DIR.glob("*.json"))]))
         m = re.fullmatch(r"/samples/([\w\-]+)", path)

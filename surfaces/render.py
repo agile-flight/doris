@@ -12,6 +12,7 @@ from typing import Any, Iterable, Optional
 from zoneinfo import ZoneInfo
 
 LOCAL = ZoneInfo("America/Los_Angeles")   # Cal Hacks is in Berkeley
+DESK_CONFIG: Optional[dict] = None         # set when the shared desk (SpacetimeDB) is on; pages then subscribe to it
 TAGLINE = "Doris only trusts what's on file."
 
 VERDICT = {
@@ -133,7 +134,7 @@ ol.trace .t{font-size:12px;color:var(--quiet);margin-left:6px}ol.trace li.vendor
 POLL_JS = """
 <script>
 (function(){var el=document.body;var url=el.getAttribute('data-poll');if(!url)return;var me=el.getAttribute('data-id');
-setInterval(function(){fetch(url,{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
+function tick(){fetch(url,{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
 if(s.latest_id&&s.latest_id!==me){location.href='/d/'+encodeURIComponent(s.latest_id);return}
 var c=document.getElementById('call-status');if(c&&s.call_text!==undefined)c.textContent=s.call_text;
 var ol=document.getElementById('trace');if(ol&&s.trace_count!==undefined&&s.trace_count!==ol.children.length){
@@ -142,21 +143,31 @@ var t=document.createElement('template');t.innerHTML=h;var items=t.content.query
 for(var i=0;i<ol.children.length;i++){ol.children[i].classList.remove('live')}
 for(var j=ol.children.length;j<items.length;j++){var li=items[j].cloneNode(true);li.style.setProperty('--i','0');ol.appendChild(li)}
 if(items.length&&items[items.length-1].classList.contains('live')&&ol.lastElementChild){ol.lastElementChild.classList.add('live')}})}
-}).catch(function(){})},1500)})();
+}).catch(function(){})}
+window.addEventListener('doris:changed',tick);
+(function loop(){setTimeout(function(){tick();loop()},window.__dorisDeskLive?8000:1500)})();})();
 </script>"""
 
 
-def page(title: str, body: str, *, body_class: str = "", poll: Optional[str] = None, decision_id: Optional[str] = None) -> str:
+def page(title: str, body: str, *, body_class: str = "", poll: Optional[str] = None, decision_id: Optional[str] = None,
+         chain_ids: Optional[list[str]] = None) -> str:
     attrs = f' class="{esc(body_class)}"' if body_class else ""
     if poll:
         attrs += f' data-poll="{esc(poll)}" data-id="{esc(decision_id)}"'
+    if chain_ids:
+        attrs += f' data-chain="{esc(",".join(chain_ids))}"'
+    desk_head = desk_tail = ""
+    if DESK_CONFIG and poll:
+        desk_head = f'<meta name="doris-desk" content="{esc(json.dumps(DESK_CONFIG))}">'
+        desk_tail = '<script type="module" src="/static/desk.js"></script>'
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-        f"<title>{esc(title)}</title><style>{CSS}</style></head><body{attrs}><main>"
+        f"{desk_head}<title>{esc(title)}</title><style>{CSS}</style></head><body{attrs}><main>"
         "<header class=\"top\"><span class=\"name\">Doris</span>"
-        f"<span class=\"tag\">{esc(TAGLINE)}</span><nav><a href=\"/\">Queue</a><a href=\"/samples\">Samples</a></nav></header>"
-        f"{body}</main>{POLL_JS if poll else ''}</body></html>"
+        f"<span class=\"tag\">{esc(TAGLINE)}</span><nav><span id=\"desk-status\" class=\"quiet\"></span>"
+        "<a href=\"/\">Queue</a><a href=\"/samples\">Samples</a></nav></header>"
+        f"{body}</main>{POLL_JS if poll else ''}{desk_tail}</body></html>"
     )
 
 
@@ -496,7 +507,8 @@ def review_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opti
         body.append(review_panel(d))
     body += [safe(hidden_text, d), safe(ct_strip, d), safe(signals_table, d), safe(audit_trail, chain or [d], audit_ok), audit_links(d)]
     url = f"/d/{d.get('decision_id')}/state" if poll else None
-    return page(f"{label}: {d.get('invoice_id')}", "".join(body), poll=url, decision_id=d.get("decision_id"))
+    return page(f"{label}: {d.get('invoice_id')}", "".join(body), poll=url, decision_id=d.get("decision_id"),
+                chain_ids=[x.get("decision_id") for x in (chain or [d]) if x.get("decision_id")])
 
 
 def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Optional[bool] = None, poll: bool = True,
@@ -508,7 +520,8 @@ def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opt
     body = (hero + safe(trace_panel, chain or [d], events) + "".join(safe(f, d) for f in (summary, reasons, hidden_text, ct_strip))
             + safe(audit_trail, chain or [d], audit_ok) + audit_links(d) + safe(signals_table, d))
     url = f"/d/{d.get('decision_id')}/state" if poll else None
-    return page(f"BLOCKED: {d.get('invoice_id')}", body, body_class="blocked-screen", poll=url, decision_id=d.get("decision_id"))
+    return page(f"BLOCKED: {d.get('invoice_id')}", body, body_class="blocked-screen", poll=url, decision_id=d.get("decision_id"),
+                chain_ids=[x.get("decision_id") for x in (chain or [d]) if x.get("decision_id")])
 
 
 def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = True, flash: str = "",

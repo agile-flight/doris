@@ -14,6 +14,7 @@ class Store:
         self._con = sqlite3.connect(str(path), check_same_thread=False, timeout=5)
         self._con.row_factory = sqlite3.Row
         self._lock = threading.RLock()
+        self.listeners: list = []     # called with each new call event, e.g. to mirror it onto the shared desk
         with self._lock:
             self._con.executescript(
                 "CREATE TABLE IF NOT EXISTS calls (token TEXT PRIMARY KEY, decision_id TEXT NOT NULL, to_number TEXT,"
@@ -61,9 +62,15 @@ class Store:
     def add_event(self, decision_id: str, who: str, text: str, token: Optional[str] = None) -> None:
         """One line of what happened on a callback: who is 'doris', 'vendor' or 'system'."""
         with self._lock:
+            at = time.time()
             self._con.execute("INSERT INTO call_events (decision_id, token, at, who, text) VALUES (?,?,?,?,?)",
-                              (decision_id, token, time.time(), who, str(text)[:400]))
+                              (decision_id, token, at, who, str(text)[:400]))
             self._con.commit()
+        for listener in list(self.listeners):
+            try:
+                listener(decision_id, who, str(text)[:400], at)
+            except Exception:  # noqa: BLE001  (a mirror must never break the call)
+                pass
 
     def events(self, decision_ids: list[str]) -> list[dict]:
         if not decision_ids:
