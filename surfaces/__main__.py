@@ -49,7 +49,8 @@ def main(argv=None) -> int:
         if settings.role == "bounty" and settings.auto_call:
             settings.auto_call = False
         app = Surfaces(settings)
-        from . import callback, door
+        from . import callback, door, render as _render
+        _render.COMPANY = settings.company
         if settings.role in ("demo", "all"):
             callback.wire(app)
         door.wire(app)

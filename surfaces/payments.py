@@ -27,6 +27,7 @@ class Payments:
         self.started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self._done: set[str] = set()
         self._tries: dict[str, int] = {}
+        self._paid: dict[str, str] = self._state().get("paid", {})   # "vendor|invoice" -> transfer: never pay an invoice twice
         self._stop = threading.Event()
 
     def _post(self, path: str, body: dict) -> dict:
@@ -35,22 +36,29 @@ class Payments:
         with urllib.request.urlopen(req, timeout=20) as resp:
             return json.loads(resp.read())
 
-    def payer_account(self) -> str:
-        """The company's operating account in the sandbox, created once and remembered."""
+    def _state(self) -> dict:
         try:
             saved = json.loads(self.state_file.read_text())
-            if saved.get("payer_account"):
-                return saved["payer_account"]
+            return saved if isinstance(saved, dict) else {}
         except (OSError, ValueError):
-            pass
+            return {}
+
+    def _save(self, **changes) -> None:
+        state = {**self._state(), **changes}
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state_file.write_text(json.dumps(state))
+
+    def payer_account(self) -> str:
+        """The company's operating account in the sandbox, created once and remembered."""
+        if self._state().get("payer_account"):
+            return self._state()["payer_account"]
         company = self.app.settings.company
         customer = self._post("/customers", {"name": f"{company} (Doris AP)", "first_name": company, "last_name": "AP",
                                              "address": {"street_number": "2495", "street_name": "Bancroft Way", "city": "Berkeley",
                                                          "state": "CA", "zip": "94704"}})["objectCreated"]["_id"]
         account = self._post(f"/customers/{customer}/accounts", {"type": "Checking", "nickname": f"{company} operating",
                                                                   "rewards": 0, "balance": 500000})["objectCreated"]["_id"]
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        self.state_file.write_text(json.dumps({"payer_account": account}))
+        self._save(payer_account=account)
         return account
 
     def pay(self, d: dict) -> Optional[str]:
@@ -93,9 +101,18 @@ class Payments:
                 self.app.store.add_event(did, "system", f"Not paid: CRS rated the email behind this request high risk "
                                                         f"({flag.get('score')} of 100). A person has to release it.")
                 continue
-            try:
-                self.pay(d)
+            key = f"{d.get('vendor_id') or d.get('payee_name')}|{d.get('invoice_id')}"
+            if key in self._paid:
                 self._done.add(did)
+                self.app.store.add_event(did, "system", f"Not paid again: invoice {d.get('invoice_id')} was already paid "
+                                                        f"(transfer {self._paid[key][:8]}). Duplicate stopped.")
+                continue
+            try:
+                transfer = self.pay(d)
+                self._done.add(did)
+                if transfer:
+                    self._paid[key] = transfer
+                    self._save(paid=self._paid)
                 n += 1
             except (urllib.error.URLError, OSError, ValueError, KeyError) as exc:
                 self._tries[did] = self._tries.get(did, 0) + 1

@@ -13,7 +13,8 @@ def decision_id_from(url):
 
 def test_queue_shows_detector_status(surfaces):
     status, html, _, _ = http("GET", surfaces.dash_url + "/")
-    assert status == 200 and "Detector connected" in html and "Send the demo bank-change email" in html
+    assert status == 200 and "Detector connected" in html and "Send the demo bank-change email" not in html
+    assert "Send the demo bank-change email" in http("GET", surfaces.dash_url + "/demo")[1], "the presenter's remote, unlinked"
 
 
 def test_queue_when_detector_is_down(tmp_path):

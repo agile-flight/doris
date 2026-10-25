@@ -165,6 +165,14 @@ class DashboardHandler(_Base):
             live = (parse_qs(url.query).get("live") or [""])[0] == "1"
             return self.send(200, render.queue_screen(decisions, detector_ok=ok, stats=self.app.store.stats(), flash=flash,
                                                       live_from=newest if live else None))
+        if path == "/demo":
+            return self.send(200, render.demo_screen())
+        if path == "/vendors":
+            try:
+                vendors = self.app.client.vendors()
+            except DetectorError:
+                return self.send(503, render.page("Vendors", "<p>The detector isn't reachable right now.</p>"))
+            return self.send(200, render.vendors_screen(vendors))
         if path == "/latest/state":
             decisions = self.app.client.list(limit=1)
             return self.json(200, {"latest_id": decisions[0]["decision_id"] if decisions else ""})

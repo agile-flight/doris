@@ -101,3 +101,18 @@ def test_a_failed_payment_is_retried_then_handed_to_a_person(tmp_path):
 def test_off_without_a_key(tmp_path):
     from surfaces.app import Surfaces
     assert payments.wire(Surfaces(Settings(data_dir=tmp_path))) is None
+
+
+
+def test_the_same_invoice_is_never_paid_twice_even_after_a_restart(tmp_path):
+    n = FakeNessie()
+    a, b = dec(1, "PAY"), dec(2, "PAY")
+    b["invoice_id"] = a["invoice_id"]
+    app = app_with(tmp_path, n, [a, b])
+    assert payments.Payments(app).once() == 1
+    assert sum(1 for x in n.posts if x[0].endswith("/transfers")) == 1
+    assert "Duplicate stopped" in app.store.events(["dec_2"])[-1]["text"]
+    c = dec(3, "PAY")
+    c["invoice_id"] = a["invoice_id"]
+    payments.Payments(app_with(tmp_path, n, [c])).once()
+    assert sum(1 for x in n.posts if x[0].endswith("/transfers")) == 1, "the paid list survives a restart"

@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 LOCAL = ZoneInfo("America/Los_Angeles")   # Cal Hacks is in Berkeley
 DESK_CONFIG: Optional[dict] = None         # set when the shared desk (SpacetimeDB) is on; pages then subscribe to it
 TAGLINE = "Doris only trusts what's on file."
+COMPANY = ""                              # the customer this dashboard serves, set from settings at start-up
 
 VERDICT = {
     "PAY": ("Paid", "pay", "Doris approved this payment."),
@@ -442,15 +443,19 @@ def page(title: str, body: str, *, body_class: str = "", poll: Optional[str] = N
         '<div class="container-fluid px-0">'
         '<a class="navbar-brand d-flex align-items-center gap-2" href="/">'
         '<span class="fs-4 fw-bold">Doris</span>'
-        f'<span class="badge bg-secondary text-light fw-normal fs-6 d-none d-sm-inline">{esc(TAGLINE)}</span>'
-        '</a>'
+                + (f'<span class="text-muted small d-none d-sm-inline">{esc(COMPANY)} &middot; Accounts payable</span>' if COMPANY else
+           f'<span class="badge bg-secondary text-light fw-normal fs-6 d-none d-sm-inline">{esc(TAGLINE)}</span>')
+        + '</a>'
         '<div class="d-flex align-items-center gap-2">'
         '<span id="desk-status" class="text-muted small"></span>'
         f'{verdict_badge}'
-        '<a class="btn btn-outline-secondary btn-sm" href="/">Queue</a>'
-        '<a class="btn btn-outline-secondary btn-sm" href="/samples">Samples</a>'
+        '<a class="btn btn-outline-secondary btn-sm" href="/">Inbox</a>'
+        '<a class="btn btn-outline-secondary btn-sm" href="/vendors">Vendors</a>'
         '</div></div></nav>'
         f'<main>{body}</main>'
+        '<footer class="text-muted small mt-4 d-flex flex-wrap justify-content-between gap-2">'
+        f'<span>{esc(TAGLINE)} Every decision is kept in a tamper-evident record.</span>'
+        '</footer>'
         f'</div>{BOOTSTRAP_JS}{POLL_JS if poll else ""}{desk_tail}</body></html>'
     )
 
@@ -849,7 +854,7 @@ def trace_items(chain: list[dict], events: Optional[list[dict]] = None, live: bo
         text = e.get("text", "")
         if e.get("who") == "system" and (text.startswith("CRS") or text.startswith("Not paid: CRS")):
             who = "CRS"
-        elif e.get("who") == "system" and text.startswith(("Paid through Capital One", "Nothing sent:")):
+        elif e.get("who") == "system" and text.startswith(("Paid through Capital One", "Nothing sent:", "Not paid again")):
             who = "Payment"
         add(e.get("who", "system"), who, text, _clock(e["at"]))
     for d in chain[1:]:
@@ -1004,10 +1009,111 @@ def blocked_screen(d: dict, *, chain: Optional[list[dict]] = None, audit_ok: Opt
 EMPTY_ROWS = '<tr><td colspan="6" class="text-center text-muted py-4">No decisions yet</td></tr>'
 
 
-def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = True, flash: str = "",
-                 live_from: Optional[str] = None) -> str:
-    rows = []
+def _latest_per_invoice(decisions: list[dict]) -> list[dict]:
+    latest: dict[str, dict] = {}
     for d in decisions:
+        key = d.get("invoice_id") or d.get("decision_id") or ""
+        if key not in latest or int(d.get("seq") or 0) > int(latest[key].get("seq") or 0):
+            latest[key] = d
+    return list(latest.values())
+
+
+def kpi_strip(decisions: list[dict]) -> str:
+    """Where every payment request stands now (the newest decision per invoice)."""
+    now = _latest_per_invoice(decisions)
+
+    def total(kind: str) -> tuple[int, float]:
+        ds = [d for d in now if d.get("decision") == kind]
+        return len(ds), sum(float(d["amount"]) for d in ds if isinstance(d.get("amount"), (int, float)))
+    blocked, paid = total("BLOCKED"), total("PAY")
+    calling, holding = total("CALLBACK")[0], total("HOLD")[0]
+    tiles = [
+        ("Fraud stopped", money(blocked[1], "USD") if blocked[1] else str(blocked[0]),
+         f"{blocked[0]} payment{'s' if blocked[0] != 1 else ''} blocked", "text-danger"),
+        ("Paid", money(paid[1], "USD") if paid[1] else str(paid[0]), f"{paid[0]} paid exactly once", "text-success"),
+        ("Verifying now", str(calling), "calling the number on file", "text-primary"),
+        ("Waiting for a person", str(holding), "held for review", "text-warning"),
+    ]
+    cells = "".join(
+        f'<div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">'
+        f'<div class="text-muted small">{esc(label)}</div><div class="fs-4 fw-bold {cls}">{esc(value)}</div>'
+        f'<div class="text-muted small">{esc(sub)}</div></div></div></div>'
+        for label, value, sub, cls in tiles)
+    return f'<div class="row g-3 mb-4">{cells}</div>'
+
+
+def _masked_phone(number: Optional[str]) -> str:
+    digits = "".join(ch for ch in str(number or "") if ch.isdigit())
+    return f"(•••) •••-{digits[-4:]}" if len(digits) >= 4 else "none on file"
+
+
+def vendors_screen(vendors: list[dict], now: Optional[datetime] = None) -> str:
+    """The records Doris verifies against: who we pay, the account and phone on file, and since when."""
+    now = now or datetime.now(timezone.utc)
+    rows = []
+    for v in sorted(vendors, key=lambda x: (str(x.get("vendor_id", "")).startswith("emp_"), str(x.get("name", "")))):
+        since = parse_ts(v.get("phone_since"))
+        trusted = since is not None and (now - since).days >= 90
+        phone_note = (f'<span class="badge bg-success-subtle text-success-emphasis">Trusted for call-backs</span>' if trusted else
+                      f'<span class="badge bg-warning-subtle text-warning-emphasis">Changed recently: not used</span>')
+        history = v.get("payment_history") or []
+        last = history[-1] if history else None
+        kind = "Employee" if str(v.get("vendor_id", "")).startswith("emp_") else "Vendor"
+        rows.append(
+            f'<tr><td><div class="fw-semibold">{esc(v.get("name"))}</div><div class="text-muted small">{esc(kind)} &middot; {esc(v.get("domain"))}</div></td>'
+            f'<td><div class="font-monospace">****{esc(v.get("bank_last4") or "????")}</div>'
+            f'<div class="text-muted small">since {esc(when(v.get("bank_since"), "month"))}</div></td>'
+            f'<td><div class="font-monospace">{esc(_masked_phone(v.get("phone")))}</div>'
+            f'<div class="text-muted small">since {esc(when(v.get("phone_since"), "month"))}</div>{phone_note}</td>'
+            f'<td>{money(last, "USD") if isinstance(last, (int, float)) else "none yet"}'
+            f'<div class="text-muted small">{len(history)} payment{"s" if len(history) != 1 else ""} on file</div></td></tr>')
+    body = (
+        f'<div class="card border-0 shadow-sm"><div class="card-body">'
+        f'<h5 class="card-title fw-bold mb-1">Vendors and employees on file</h5>'
+        f'<p class="text-muted small">Doris checks every request against these records, and only calls a number that has been '
+        f'on file, unchanged, for 90 days. Numbers are masked on this screen.</p>'
+        f'<div class="table-responsive"><table class="table align-middle mb-0">'
+        f'<thead class="table-light"><tr><th>Name</th><th>Bank account on file</th><th>Phone on file</th><th>Last payment</th></tr></thead>'
+        f'<tbody>{"".join(rows) or "<tr><td colspan=4 class=text-muted>No records yet</td></tr>"}</tbody>'
+        f'</table></div></div></div>'
+    )
+    return page("Vendors", body)
+
+
+SEND_KEYS_JS = """<script>
+document.addEventListener('keydown', function (e) {
+  if (e.metaKey || e.ctrlKey || e.altKey || (e.target && e.target.closest && e.target.closest('input,textarea,select'))) return;
+  var s = {'1': 'vendor', '2': 'payroll', '3': 'routine'}[e.key];
+  if (!s) return;
+  fetch('/demo/send?scenario=' + s, {method: 'POST'}).then(function (r) { if (r.redirected) location.href = r.url; });
+});
+</script>"""
+
+
+def demo_controls() -> str:
+    return (
+        f'<form method="post" action="/demo/send" class="d-grid gap-2">'
+        f'<button class="btn btn-primary btn-lg">Send the demo bank-change email</button>'
+        f'<button class="btn btn-outline-primary btn-lg" formaction="/demo/send?scenario=payroll">Send the payroll direct-deposit email</button>'
+        f'<button class="btn btn-outline-secondary btn-lg" formaction="/demo/send?scenario=routine">Send a routine invoice</button>'
+        f'</form>'
+    )
+
+
+def demo_screen() -> str:
+    """The presenter's remote: not linked from anywhere. Each button sends a sample email into the inbox."""
+    body = (f'<div class="card border-0 shadow-sm"><div class="card-body">'
+            f'<h5 class="card-title fw-bold mb-1">Send a sample email</h5>'
+            f'<p class="text-muted small">Each one goes into the accounts payable inbox exactly as a real email would. '
+            f'On the inbox page, the keys 1, 2 and 3 do the same.</p>{demo_controls()}</div></div>')
+    return page("Send a sample email", body)
+
+
+def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optional[dict] = None, demo: bool = False, flash: str = "",
+                 live_from: Optional[str] = None) -> str:
+    decisions = list(decisions)
+    rows = []
+    for d in sorted(_latest_per_invoice(decisions), key=lambda x: int(x.get("seq") or 0), reverse=True):
         rows.append(
             f'<tr>'
             f'<td class="text-nowrap">{esc(when(d.get("created_at"), "short"))}</td>'
@@ -1019,21 +1125,9 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
             f'</tr>'
         )
     status_badge = '<span class="badge bg-success">Detector connected</span>' if detector_ok else '<span class="badge bg-danger">Detector not reachable</span>'
-    demo_form = (
-        f'<div class="d-flex flex-wrap align-items-center gap-3 mt-2">'
-        f'<form method="post" action="/demo/send">'
-        f'<button class="btn btn-primary btn-verdict">Send the demo bank-change email</button> '
-        f'<button class="btn btn-outline-primary btn-verdict" formaction="/demo/send?scenario=payroll">Send the payroll direct-deposit email</button> '
-        f'<button class="btn btn-outline-secondary btn-verdict" formaction="/demo/send?scenario=routine">Send a routine invoice</button>'
-        f'</form>'
-        f'<span class="text-muted small">Runs a demo email through Doris and opens its decision screen.</span>'
-        f'</div>'
-        f'<p class="text-muted small mt-2 mb-0">'
-        f'<a class="text-decoration-none fw-semibold" href="/?live=1">Live mode</a> — this page opens each new decision the moment it arrives.'
-        f'</p>'
-    ) if demo else ""
+    demo_form = demo_controls() if demo else ""
     door = ""
-    if stats:
+    if stats and stats.get("checks"):
         door = (
             f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
             f'<h6 class="card-title text-uppercase text-muted small fw-bold">Forward-to-check door</h6>'
@@ -1044,17 +1138,17 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
         )
     flash_html = f'<div class="alert alert-warning mb-4 shadow-sm">{esc(flash)}</div>' if flash else ""
     header_card = (
-        f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
         f'<div class="d-flex justify-content-between align-items-center mb-2">'
-        f'<h5 class="card-title fw-bold mb-0">System Status</h5>'
-        f'{status_badge}'
-        f'</div>'
-        f'{demo_form}'
-        f'</div></div>'
+        f'<h5 class="fw-bold mb-0">This week</h5>{status_badge}</div>'
+        f'{kpi_strip(decisions)}'
+        + (f'<div class="card border-0 shadow-sm mb-4"><div class="card-body">'
+           f'<h6 class="card-title text-uppercase text-muted small fw-bold mb-1">Simulator</h6>'
+           f'{demo_form}'
+           f'</div></div>' if demo_form else "")
     )
     table_card = (
         f'<div class="card border-0 shadow-sm"><div class="card-body">'
-        f'<h5 class="card-title fw-bold mb-3">Decisions, newest first</h5>'
+        f'<h5 class="card-title fw-bold mb-3">Payment requests, newest first</h5>'
         f'<div class="table-responsive">'
         f'<table class="table table-hover align-middle mb-0">'
         f'<thead class="table-light"><tr><th>When</th><th>Invoice</th><th>Claims to be</th><th>Amount</th><th>Decision</th><th class="text-end">Risk</th></tr></thead>'
@@ -1063,9 +1157,10 @@ def queue_screen(decisions: Iterable[dict], *, detector_ok: bool, stats: Optiona
         f'</div></div></div>'
     )
     body = flash_html + header_card + door + table_card
+    body += SEND_KEYS_JS
     if live_from is not None:
-        return page("Doris queue (live)", body, poll="/latest/state", decision_id=live_from)
-    return page("Doris queue", body)
+        return page("Inbox", body, poll="/latest/state", decision_id=live_from)
+    return page("Inbox", body)
 
 
 def samples_screen(names: list[str]) -> str:

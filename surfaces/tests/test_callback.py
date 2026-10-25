@@ -210,7 +210,7 @@ def test_demo_seed_puts_the_table_phone_on_file(tmp_path):
                 urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1); break
             except OSError:
                 time.sleep(0.1)
-        raw = (ROOT / "surfaces/demo/bank_change_demo.eml").read_bytes()
+        raw = (ROOT / "surfaces/demo/vendor_bank_change.eml").read_bytes()     # the demo database's vendor
         req = urllib.request.Request(f"http://127.0.0.1:{port}/check", data=raw, method="POST", headers={"Content-Type": "message/rfc822"})
         d = json.loads(urllib.request.urlopen(req, timeout=30).read())
         assert d["decision"] == "CALLBACK" and d["callback_number"] == "+14155550199"

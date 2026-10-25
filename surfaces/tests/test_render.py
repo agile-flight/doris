@@ -110,7 +110,9 @@ def test_queue_and_samples_screens():
     ds = [json.loads(p.read_text()) for p in SAMPLES]
     html = render.queue_screen(ds, detector_ok=True, stats={"checks": 3, "scam": 1, "suspicious": 1, "up": 2, "down": 0})
     assert balanced(html) and "Detector connected" in html and "3 emails checked" in html
-    assert all(d["decision_id"] in html for d in ds)
+    latest = render._latest_per_invoice(ds)
+    assert all(d["decision_id"] in html for d in latest), "one row per invoice: where it stands now"
+    assert len(latest) <= len(ds)
     assert "not reachable" in render.queue_screen([], detector_ok=False)
     assert balanced(render.samples_screen([p.stem for p in SAMPLES]))
 
@@ -121,3 +123,23 @@ def test_money_and_phone_formatting():
     assert render.money(10, "JPY") == "10.00 JPY"
     assert render.pretty_phone("+14155550123") == "+1 (415) 555-0123"
     assert render.pretty_phone("+442071234567") == "+442071234567"
+
+
+
+def test_queue_summary_and_vendors_page():
+    from surfaces import render
+    ds = [{"decision_id": "a", "seq": 1, "invoice_id": "I1", "decision": "CALLBACK", "amount": 4820.0},
+          {"decision_id": "b", "seq": 2, "invoice_id": "I1", "decision": "BLOCKED", "amount": 4820.0},
+          {"decision_id": "c", "seq": 3, "invoice_id": "I2", "decision": "PAY", "amount": 1000.0},
+          {"decision_id": "d", "seq": 4, "invoice_id": "I3", "decision": "HOLD", "amount": None}]
+    strip = render.kpi_strip(ds)
+    assert "$4,820.00" in strip and "1 payment blocked" in strip and "$1,000.00" in strip and "Verifying now" in strip
+    assert ">0<" in strip, "the superseded CALLBACK is not counted as still calling"
+    html = render.vendors_screen([{"vendor_id": "ven_x", "name": "Tannerfield Supply Co.", "domain": "tannerfieldsupply.com",
+                                   "phone": "+16695551234", "phone_since": "2021-03-10T17:22:00Z", "bank_last4": "1234",
+                                   "bank_since": "2021-03-10T17:22:00Z", "payment_history": [4400.0, 4650.0]},
+                                  {"vendor_id": "emp_y", "name": "Kayla Brennan", "domain": "marlowerobotics.com",
+                                   "phone": "+16695559999", "phone_since": "2099-01-01T00:00:00Z", "bank_last4": "4417",
+                                   "payment_history": []}])
+    assert balanced(html) and "(•••) •••-1234" in html and "6695551234" not in html and "Trusted for call-backs" in html
+    assert "Changed recently: not used" in html and "$4,650.00" in html and "Employee" in html

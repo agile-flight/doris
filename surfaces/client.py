@@ -67,6 +67,9 @@ class DetectorClient:
         return self._call("POST", f"/decisions/{urllib.parse.quote(decision_id, safe='')}/review",
                           {"approve": bool(approve), "reviewer": reviewer, "notes": notes})
 
+    def vendors(self) -> list[dict]:
+        return self._call("GET", "/vendors")
+
     def vendor(self, vendor_id: Optional[str]) -> Optional[dict]:
         """The record on file for a vendor (with its payment history), or None."""
         if not vendor_id:
