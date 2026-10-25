@@ -108,6 +108,11 @@ bound, not a field estimate. `tests/test_evaluate.py` locks in the numbers and t
 - [ ] Keys stay out of git: keep them in a file outside the repo (or `.env`, which is ignored) and share them with your teammate directly, not through GitHub.
 - [ ] Verify the demo phone number with Twilio; record the backup video; register the domain; post the Slack ask and bounty (build doc, Data and traction).
 
+## Live trace and audit packet (2026-10-25)
+The review and BLOCKED screens open with "What Doris did": her steps on the invoice, then the call transcript as it
+happens (stored as call events in surfaces' own database). `/d/<id>/audit` and `/d/<id>/audit.json` give a printable
+record and a downloadable packet with every hash recomputed by the dashboard. Tests: `surfaces/tests/test_trace_audit.py`.
+
 ## AI fraud (2026-10-24)
 Two gaps closed in surfaces: a hijacked vendor line answered by a cloned voice must also know the last payment on
 file before money moves (a miss leaves it frozen, never blocked); approving a held payment requires saying how it

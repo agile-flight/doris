@@ -183,7 +183,17 @@ class CallManager:
             self.app.store.update_call(token, status="failed", notes=str(exc)[:300])
             raise exc if isinstance(exc, TelephonyError) else TelephonyError(f"the call could not be placed: {exc}") from None
         self.app.store.update_call(token, status=result.get("status") or "queued", twilio_sid=result.get("sid"))
+        self._event(decision["decision_id"], "system", f"Dialing {decision['callback_number']}, the number on file, never one from the email", token)
         return token
+
+    def _event(self, decision_id: str, who: str, text: str, token: Optional[str] = None) -> None:
+        try:
+            self.app.store.add_event(decision_id, who, text, token)
+        except Exception:  # noqa: BLE001  (the transcript is a view; it must never break the call)
+            log.exception("could not record a call event")
+
+    def _say(self, call: dict, token: str, line: str) -> None:
+        self._event(call["decision_id"], "doris", line, token)
 
     def _prerender(self, script: dict) -> None:
         for key in ("reprompt", "confirm", "verify", "verify_failed", "denied", "confirmed", "unclear", "handled"):
@@ -261,6 +271,8 @@ class CallManager:
             self.app.store.update_call(token, status="resolved-elsewhere")
             return f"<Response>{self._speak(script['handled'])}<Hangup/></Response>"
         self.app.store.update_call(token, status="in-progress")
+        self._event(call["decision_id"], "system", "The vendor picked up", token)
+        self._say(call, token, script["prompt"])
         return f"<Response>{self._gather(token, script['prompt'])}</Response>"
 
     def gather_twiml(self, token: str, form: dict) -> Optional[str]:
@@ -273,6 +285,8 @@ class CallManager:
         script = lines(decision, self.app.settings.company)
         speech = (form.get("SpeechResult") or "").strip()[:200]
         digits = (form.get("Digits") or "").strip()[:12]
+        heard = speech or (f"(pressed {digits})" if digits else "(silence)")
+        self._event(call["decision_id"], "vendor", heard, token)
         if call.get("stage") == "verifying":
             # The records check. A hijacked line or a cloned voice still has to know what only the vendor knows.
             # A miss never blocks a real vendor: it leaves the payment frozen for a person.
@@ -281,31 +295,43 @@ class CallManager:
             if amount is not None and expected is not None and abs(amount - expected) <= 1.0:
                 said = f"{call.get('notes')}; last payment we sent: {answer} (matches the record on file)"
                 self.app.store.update_call(token, status="saving", result=said, stage="confirmed")
+                self._event(call["decision_id"], "system", "That matches the last payment on file", token)
+                self._say(call, token, script["confirmed"])
                 self._post(token, call["decision_id"], "confirmed", said, decision.get("callback_number"))
                 return f"<Response>{self._speak(script['confirmed'])}<Hangup/></Response>"
             said = f"{call.get('notes')}; last payment we sent: {answer} (does not match the record on file)"
             self.app.store.update_call(token, status="inconclusive", result=said, stage="failed-check")
+            self._event(call["decision_id"], "system", "That doesn't match the last payment on file: the payment stays frozen for a person", token)
+            self._say(call, token, script["verify_failed"])
             return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
         outcome = classify(speech, digits[:1] if digits else "")
         said = speech or (f"pressed {digits}" if digits else "")
         if outcome == "confirmed" and call.get("stage") != "confirming":
             self.app.store.update_call(token, stage="confirming", notes=said)
+            self._say(call, token, script["confirm"])
             return f"<Response>{self._gather(token, script['confirm'])}</Response>"
         if outcome is None:
             if call.get("stage") != "confirming" and call["attempts"] < 1:
                 self.app.store.update_call(token, attempts=call["attempts"] + 1)
+                self._say(call, token, script["reprompt"])
                 return f"<Response>{self._gather(token, script['reprompt'])}</Response>"
             self.app.store.update_call(token, status="inconclusive", notes=said or "no answer")
+            self._event(call["decision_id"], "system", "No clear answer: the payment stays frozen", token)
+            self._say(call, token, script["unclear"])
             return f"<Response>{self._speak(script['unclear'])}<Hangup/></Response>"
         if outcome == "confirmed":
             said = f"{call.get('notes') or 'yes'}; then, asked again: {said}"
             if self._last_payment(decision) is None:
                 self.app.store.update_call(token, status="inconclusive", stage="failed-check",
                                            result=f"{said}; no payment history on file to check against")
+                self._event(call["decision_id"], "system", "No payment history on file to check against: a person decides", token)
+                self._say(call, token, script["verify_failed"])
                 return f"<Response>{self._speak(script['verify_failed'])}<Hangup/></Response>"
             self.app.store.update_call(token, stage="verifying", notes=said)
+            self._say(call, token, script["verify"])
             return f"<Response>{self._gather(token, script['verify'], amount=True)}</Response>"
         self.app.store.update_call(token, status="saving", result=said or outcome, stage=outcome)
+        self._say(call, token, script[outcome])
         self._post(token, call["decision_id"], outcome, said or outcome, decision.get("callback_number"))
         return f"<Response>{self._speak(script[outcome])}<Hangup/></Response>"
 
@@ -313,8 +339,9 @@ class CallManager:
         """Hand the vendor's answer to the detector; if it is down, keep the answer and keep trying."""
         def attempt() -> bool:
             try:
-                self.app.client.callback_result(decision_id, confirmed=outcome == "confirmed", notes=said, called=called)
+                follow = self.app.client.callback_result(decision_id, confirmed=outcome == "confirmed", notes=said, called=called)
                 self.app.store.update_call(token, status="completed")
+                self._event(decision_id, "system", f"Doris recorded the answer: {(follow or {}).get('decision', 'done')}", token)
                 return True
             except DetectorError as exc:
                 if exc.status in (400, 404, 409):       # resolved by the clerk meanwhile, or refused: stop
@@ -339,6 +366,9 @@ class CallManager:
         status = (form.get("CallStatus") or "").strip()[:20]
         if status and call["status"] in LIVE and not call.get("result"):
             self.app.store.update_call(token, status=status)
+            shown = {"ringing": "Ringing", "busy": "Line busy", "no-answer": "No answer", "failed": "The call failed", "canceled": "Call canceled"}
+            if status in shown:
+                self._event(call["decision_id"], "system", shown[status], token)
         return True
 
 

@@ -53,6 +53,15 @@ Limits (taken atomically): 5 per sender per hour, 30 per minute, 5 MB; frozen no
 Replies carry `Auto-Submitted: auto-replied`; no replies to automated mail or to itself; the door never places calls.
 Feedback links open a page whose button records the label, so link scanners can't.
 
+## What judges see
+
+- **What Doris did**: under the verdict, a timeline of her steps (email in, invoice read, records compared, checks
+  run, Claude's read, the decision) and then the call, line by line, as it happens: Doris's question, the vendor's
+  answer, the result. New lines appear live; the newest pulses while the call is on.
+- **Audit record**: `/d/<id>/audit` is a printable record of the invoice's decisions, the transcript, and every hash
+  recomputed by the dashboard itself; `/d/<id>/audit.json` downloads the same as an audit packet, with a Python
+  snippet anyone can run to check the hashes.
+
 ## AI fraud: a hijacked line, a cloned voice, forged documents
 
 - After a vendor says yes twice, Doris asks the amount of the last payment we sent them (read from the payment
